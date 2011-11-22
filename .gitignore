@@ -1,17 +1,25 @@
-
-#ignore thumbnails created by windows
-Thumbs.db
-#Ignore files build by Visual Studio
-*.obj
-*.exe
-*.pdb
+docs/*
+!docs/Doxyfile
+Debug/*
+Release/*
+.*
+moc_*
+## VS files
+*.sln
+*.vcproj
+*.ncb
 *.user
+*.htm
+*.manifest
+*.idb
+*.pdb
+*.exe
+*.obj
 *.aps
 *.pch
 *.vspscc
 *_i.c
 *_p.c
-*.ncb
 *.suo
 *.tlb
 *.tlh
@@ -19,11 +27,16 @@ Thumbs.db
 *.cache
 *.ilk
 *.log
-[Bb]in
-[Dd]ebug*/
 *.lib
 *.sbr
-obj/
+*.qrc
+*.dll
+## VS diretories
+[Bb]in
+[Dd]ebug*/
 [Rr]elease*/
+obj/
+dominator/
 _ReSharper*/
-[Tt]est[Rr]esult*
+## Thumbnails created by Windows
+Thumbs.db
