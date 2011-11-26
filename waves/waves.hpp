@@ -19,7 +19,6 @@ enum ComputationMode {
 	SHADER
 };
 
-
 using namespace m3d;
 
 struct Wave {

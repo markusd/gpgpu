@@ -123,6 +123,10 @@ bool createContext(cl_device_type type, cl_context_properties glContext, cl_cont
 			std::cout << "OpenCL: No platform found" << std::endl;
 			return false;
 		}
+		for (int i = 0; i < platforms.size(); ++i) {
+			std::cout << platforms[i].getInfo(CL_PLATFORM_NAME, &info);
+			std::cout << "Platform found " << info << std::endl;
+		}
 		platform = platforms[0];
 		platform.getInfo(CL_PLATFORM_NAME, &info);
 		std::cout << "Platform name " << info << std::endl;
