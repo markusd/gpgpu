@@ -37,12 +37,6 @@ using namespace m3d;
 #define WIDTH 512
 #define HEIGHT 512
 
-// Use OpenCL<->OpenGL interop for direct texture writes from kernels
-#define GL_INTEROP
-
-// Use a render buffer as target for the kernel
-//#define GL_FBO
-
 // OpenCL vars
 /*
 cl_platform_id clPlatform;
@@ -82,7 +76,11 @@ Viewport::Viewport(QWidget* parent) :
 	setMinimumHeight(HEIGHT);
 	setMaximumWidth(WIDTH);
 	setMaximumHeight(HEIGHT);
+#ifndef CPU_FLOAT
 	m_textureData = (unsigned char *)malloc(WIDTH * HEIGHT * 3 * sizeof(unsigned char));
+#else
+	m_textureData = (float *)malloc(WIDTH * HEIGHT * 3 * sizeof(float));
+#endif
 #ifndef GL_INTEROP
 	m_clTextureData = (float *)malloc(WIDTH * HEIGHT * 4 * sizeof(float));
 #endif
@@ -119,7 +117,11 @@ void Viewport::initializeGL()
 #ifdef GL_INTEROP
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, WIDTH, HEIGHT, 0, GL_RGBA, GL_FLOAT, NULL);
 #else
+#ifdef CPU_FLOAT
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, WIDTH, HEIGHT, 0, GL_RGB, GL_FLOAT, m_textureData);
+#else
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, WIDTH, HEIGHT, 0, GL_RGB, GL_UNSIGNED_BYTE, m_textureData);
+#endif
 #endif
 
 #ifdef GL_INTEROP
@@ -320,12 +322,19 @@ void Viewport::createTextureCPU(float dt)
 	Vec2f TexCoord;
 
 	dt *= 0.33333333f;
-
+#ifndef CPU_FLOAT
 	float waves = 637.5f / (float)m_waves.size();
+#else
+	float waves = 2.5f / (float)m_waves.size();
+#endif
 	if (m_waves.size() > 0) 
 	for (int x = 0; x < WIDTH; ++x) {
 		for (int y = 0; y < HEIGHT; ++y) {
+#ifndef CPU_FLOAT
 			Vec3ub* c = (Vec3ub *)&m_textureData[(x + y * WIDTH) * 3];
+#else
+			Vec3f* c = (Vec3f *)&m_textureData[(x + y * WIDTH) * 3];
+#endif
 
 			amp = 0.0f;
 
@@ -337,7 +346,7 @@ void Viewport::createTextureCPU(float dt)
 				dist = (TexCoord - m_waves[i].pos).len();
 				amp += waves * sinf(6.2831f * (dt - dist * 5.0f));
 			}
-			
+#ifndef CPU_FLOAT
 			int iamp = abs((int)amp) * 2;
 
 			c->x = c->y = c->z = 0;
@@ -362,14 +371,42 @@ void Viewport::createTextureCPU(float dt)
 			c->x = 255 - c->x;
 			c->y = 255 - c->y;
 			c->z = 255 - c->z;
+#else
+				float r = 0.0f;
+				float g = 0.0f;
+				float b = 0.0f;
+				amp = 2.0f * (amp < 0.0f ? -amp : amp);
+				if (amp <= 1.0f) {
+					r = 1.0f;
+					g = amp;
+				} else if (amp <= 2.0f) {
+					r = (1.96f - amp);
+					g = 1.0f;
+				} else if (amp <= 3.0f) {
+					g = 1.0f;
+					b = (amp - 2.0f);
+				} else if (amp <= 4.0f) {
+					g = (4.0f - amp);
+					b = 1.0f;
+				} else {
+					r = (amp - 4.01f);
+					b = 1.0f;
+				}
 
+				c->x = 1.0f - r;
+				c->y = 1.0f - g;
+				c->z = 1.0f - b;
+#endif
 			//std::cout << (int)c->x << std::endl;
 			//std::cout << (int)c->y << std::endl;
 			//std::cout << (int)c->z << std::endl << std::endl;
 		}
 	}
-	
+#ifndef CPU_FLOAT
 	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, WIDTH, HEIGHT, GL_RGB, GL_UNSIGNED_BYTE, m_textureData);
+#else
+	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, WIDTH, HEIGHT, GL_RGB, GL_FLOAT, m_textureData);
+#endif
 	//glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, WIDTH, HEIGHT, 0, GL_RGB, GL_FLOAT, m_textureData);
 }
 
@@ -388,7 +425,12 @@ void Viewport::setComputationMode(ComputationMode mode)
 		glEnable(GL_TEXTURE_2D);
 		m_texture->bind();
 		ogl::__Shader::unbind();
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, WIDTH, HEIGHT, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+#ifndef CPU_FLOAT
+		glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, WIDTH, HEIGHT, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+#else
+		//glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, WIDTH, HEIGHT, GL_RGB, GL_FLOAT, NULL);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, WIDTH, HEIGHT, 0, GL_RGB, GL_FLOAT, NULL);
+#endif
 	} else if  (m_mode == OPENCL) {
 		glEnable(GL_TEXTURE_2D);
 		m_texture->bind();

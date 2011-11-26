@@ -45,7 +45,11 @@ public:
 	float m_xoffs;
 	float m_yoffs;
 
+#ifndef CPU_FLOAT
 	unsigned char* m_textureData;
+#else
+	float* m_textureData;
+#endif
 	float* m_clTextureData;
 
 	QTimer* m_timer;
