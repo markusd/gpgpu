@@ -61,7 +61,8 @@ cl::BufferRenderGL clRenderBuffer;
 GLuint glFBO;
 GLuint glRB;
 
-std::vector<Vec2d> input, centroids;
+std::vector<Vec2d> input, seed, centroids;
+Vec2d mean;
 
 Viewport::Viewport(QWidget* parent) :
 	QGLWidget(parent)
@@ -117,20 +118,38 @@ void Viewport::paintGL()
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	float dt = m_clock.get();
 
+	// input
 	glColor3f(0.0f, 0.0f, 0.0f);
-	glPointSize(1.0f);
+	glPointSize(2.0f);
 	glBegin(GL_POINTS);
 	for (int i = 0; i < input.size(); ++i) {
 		glVertex2d(input[i].x * WIDTH, input[i].y * HEIGHT);
 	}
 	glEnd();
 
+	// centroids
 	glColor3f(1.0f, 0.0f, 0.0f);
 	glPointSize(4.0f);
 	glBegin(GL_POINTS);
 	for (int i = 0; i < centroids.size(); ++i) {
 		glVertex2d(centroids[i].x * WIDTH, centroids[i].y * HEIGHT);
 	}
+	glEnd();
+
+	// seed
+	glColor3f(0.0f, 0.0f, 1.0f);
+	glPointSize(3.0f);
+	glBegin(GL_POINTS);
+	for (int i = 0; i < seed.size(); ++i) {
+		glVertex2d(seed[i].x * WIDTH, seed[i].y * HEIGHT);
+	}
+	glEnd();
+
+	// mean
+	glColor3f(1.0f, 1.0f, 0.0f);
+	glPointSize(4.0f);
+	glBegin(GL_POINTS);
+		glVertex2d(mean.x * WIDTH, mean.y * HEIGHT);
 	glEnd();
 	
 	frames++;
@@ -162,7 +181,10 @@ void Viewport::mouseButton(util::Button button, bool down, int x, int y)
 		//	std::cout << input[i] << std::endl;
 		//}
 
-		centroids = kmeans(2, input);
+		std::pair<Vec2d, std::vector<Vec2d> > seed_result = hartigan_wong(5, input);
+		mean = seed_result.first;
+		seed = seed_result.second;
+		centroids = kmeans(5, input, seed);
 
 		//for (int i = 0; i < centroids.size(); ++i) {
 		//	std::cout << centroids[i] << std::endl;
