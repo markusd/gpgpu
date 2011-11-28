@@ -38,13 +38,24 @@ public:
 	QtMouseAdapter m_mouseAdapter;
 	QtKeyAdapter m_keyAdapter;
 
+	// input parameters
+	int m_k;
+	int m_iterations;
+	SeedingAlgorithm m_seedingAlgorithm;
+
+
+	std::vector<Vec2d> m_input, m_seed, m_centroids;
+	Vec2d m_mean;
 
 	virtual void mouseMove(int x, int y);
 	virtual void mouseButton(util::Button button, bool down, int x, int y);
 	virtual void mouseDoubleClick(util::Button button, int x, int y);
 	virtual void mouseWheel(int delta);
 public slots:
-	//void setComputationMode(ComputationMode mode);
+	void setSeedingAlgorithm(SeedingAlgorithm s);
+	void setK(int i) { m_k = i; };
+	void setIterations(int i) { m_iterations = i; };
+	void doCluster();
 signals:
 	void framesPerSecondChanged(int);
 };

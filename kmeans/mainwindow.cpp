@@ -6,6 +6,8 @@
 #include <QtGui/QLabel>
 #include <QtGui/QSplitter>
 #include <QtGui/QStatusBar>
+#include <QtGui/QPushButton>
+#include <QtGui/QSpinBox>
 
 MainWindow::MainWindow(QApplication* app)
 {
@@ -40,10 +42,15 @@ MainWindow::MainWindow(QApplication* app)
 	setCentralWidget(splitter);
 
 	connect(m_viewport, SIGNAL(framesPerSecondChanged(int)), this, SLOT(updateFramesPerSecond(int)));
-	connect(m_toolBox, SIGNAL(setComputationMode(ComputationMode)), m_viewport, SLOT(setComputationMode(ComputationMode)));
+	connect(m_toolBox, SIGNAL(setSeedingAlgorithm(SeedingAlgorithm)), m_viewport, SLOT(setSeedingAlgorithm(SeedingAlgorithm)));
+
+	connect(m_toolBox->m_doClusterButton, SIGNAL(clicked()), m_viewport, SLOT(doCluster()));
+	connect(m_toolBox->m_kBox, SIGNAL(valueChanged(int)), m_viewport, SLOT(setK(int)));
+	connect(m_toolBox->m_iterationsBox, SIGNAL(valueChanged(int)), m_viewport, SLOT(setIterations(int)));
 	
 	show();
-this->adjustSize();
+	this->adjustSize();
+
 	m_viewport->updateGL();
 	m_viewport->m_timer->start();
 }

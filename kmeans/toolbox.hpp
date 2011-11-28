@@ -7,6 +7,8 @@
 
 class QGroupBox;
 class QRadioButton;
+class QPushButton;
+class QSpinBox;
 
 class ToolBox: public QWidget {
 Q_OBJECT
@@ -14,17 +16,20 @@ public:
 	ToolBox(QWidget* parent = 0);
 
 public slots:
-	//void typeChanged();
+	void seedingAlgorithmChanged();
 
 signals:
-	//void setComputationMode(ComputationMode mode);
+	void setSeedingAlgorithm(SeedingAlgorithm s);
 
-private:
-	/*
-	QGroupBox* m_typeGroup;
-	QRadioButton* m_cpuButton;
-	QRadioButton* m_shaderButton;
-	QRadioButton* m_openclButton;*/
+public:
+	QGroupBox* m_seedingGroup;
+	QRadioButton* m_randomButton;
+	QRadioButton* m_hartiganWongButton;
+
+	QGroupBox* m_parametersGroup;
+	QSpinBox* m_kBox;
+	QSpinBox* m_iterationsBox;
+	QPushButton* m_doClusterButton;
 };
 
 #endif /* TOOLBOX_HPP_ */

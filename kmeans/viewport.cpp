@@ -9,6 +9,7 @@
 #include <windows.h>
 #endif
 
+#include <QtGui/QMessageBox>
 #include <viewport.hpp>
 #include <qutils.hpp>
 
@@ -34,8 +35,8 @@
 
 using namespace m3d;
 
-#define WIDTH 512
-#define HEIGHT 512
+#define WIDTH 768
+#define HEIGHT 768
 
 // OpenCL vars
 /*
@@ -61,8 +62,6 @@ cl::BufferRenderGL clRenderBuffer;
 GLuint glFBO;
 GLuint glRB;
 
-std::vector<Vec2d> input, seed, centroids;
-Vec2d mean;
 
 Viewport::Viewport(QWidget* parent) :
 	QGLWidget(parent)
@@ -74,6 +73,10 @@ Viewport::Viewport(QWidget* parent) :
 	setMinimumHeight(HEIGHT);
 	setMaximumWidth(WIDTH);
 	setMaximumHeight(HEIGHT);
+
+	m_k = 1;
+	m_iterations = 10;
+	m_seedingAlgorithm = RANDOM;
 
 	m_timer = new QTimer(this);
 	connect(m_timer, SIGNAL(timeout()), this, SLOT(updateGL()));
@@ -122,34 +125,34 @@ void Viewport::paintGL()
 	glColor3f(0.0f, 0.0f, 0.0f);
 	glPointSize(2.0f);
 	glBegin(GL_POINTS);
-	for (int i = 0; i < input.size(); ++i) {
-		glVertex2d(input[i].x * WIDTH, input[i].y * HEIGHT);
+	for (int i = 0; i < m_input.size(); ++i) {
+		glVertex2d(m_input[i].x * WIDTH, m_input[i].y * HEIGHT);
 	}
 	glEnd();
 
 	// centroids
 	glColor3f(1.0f, 0.0f, 0.0f);
-	glPointSize(4.0f);
+	glPointSize(6.0f);
 	glBegin(GL_POINTS);
-	for (int i = 0; i < centroids.size(); ++i) {
-		glVertex2d(centroids[i].x * WIDTH, centroids[i].y * HEIGHT);
+	for (int i = 0; i < m_centroids.size(); ++i) {
+		glVertex2d(m_centroids[i].x * WIDTH, m_centroids[i].y * HEIGHT);
 	}
 	glEnd();
 
 	// seed
 	glColor3f(0.0f, 0.0f, 1.0f);
-	glPointSize(3.0f);
+	glPointSize(4.0f);
 	glBegin(GL_POINTS);
-	for (int i = 0; i < seed.size(); ++i) {
-		glVertex2d(seed[i].x * WIDTH, seed[i].y * HEIGHT);
+	for (int i = 0; i < m_seed.size(); ++i) {
+		glVertex2d(m_seed[i].x * WIDTH, m_seed[i].y * HEIGHT);
 	}
 	glEnd();
 
 	// mean
-	glColor3f(1.0f, 1.0f, 0.0f);
-	glPointSize(4.0f);
+	glColor3f(0.0f, 1.0f, 1.0f);
+	glPointSize(5.0f);
 	glBegin(GL_POINTS);
-		glVertex2d(mean.x * WIDTH, mean.y * HEIGHT);
+		glVertex2d(m_mean.x * WIDTH, m_mean.y * HEIGHT);
 	glEnd();
 	
 	frames++;
@@ -161,6 +164,49 @@ void Viewport::paintGL()
 	}
 }
 
+void Viewport::doCluster()
+{
+	//for (int i = 0; i < INPUT_SIZE; ++i) {
+	//	input.push_back(Vec2d(((double)(rand()%10000)/10000.0), ((double)(rand()%10000)/10000.0)));
+	//	std::cout << input[i] << std::endl;
+	//}
+
+	if (m_input.size() < m_k) {
+		QMessageBox msgBox;
+		msgBox.setText("Error: The input size is smaller than the number of clusters.");
+		msgBox.exec();
+		return;
+	}
+
+	switch (m_seedingAlgorithm) {
+		case RANDOM:
+			// hide mean
+			m_mean = Vec2d(-100.0, -100.0);
+			m_seed = random_seed(m_k, m_input);
+			break;
+
+		case MANUAL:
+			break;
+
+		case HARTIGAN_WONG:
+			std::pair<Vec2d, std::vector<Vec2d> > seed_result = hartigan_wong(m_k, m_input);
+			m_mean = seed_result.first;
+			m_seed = seed_result.second;
+			break;
+	}
+	
+	m_centroids = kmeans(m_iterations, m_k, m_input, m_seed);
+
+	//for (int i = 0; i < centroids.size(); ++i) {
+	//	std::cout << centroids[i] << std::endl;
+	//}
+}
+
+void Viewport::setSeedingAlgorithm(SeedingAlgorithm s)
+{
+	m_seedingAlgorithm = s;
+}
+
 
 void Viewport::mouseMove(int x, int y)
 {
@@ -169,26 +215,12 @@ void Viewport::mouseMove(int x, int y)
 void Viewport::mouseButton(util::Button button, bool down, int x, int y)
 {
 	if (button == util::LEFT && !down) {
-		input.push_back(Vec2d((double)x / (double)WIDTH, ((double)HEIGHT - (double)y) / (double)HEIGHT));
+		m_input.push_back(Vec2d((double)x / (double)WIDTH, ((double)HEIGHT - (double)y) / (double)HEIGHT));
 	}
 
 	if (button == util::RIGHT && !down) {
-		
-		srand(GetTickCount());
 
-		//for (int i = 0; i < INPUT_SIZE; ++i) {
-		//	input.push_back(Vec2d(((double)(rand()%10000)/10000.0), ((double)(rand()%10000)/10000.0)));
-		//	std::cout << input[i] << std::endl;
-		//}
 
-		std::pair<Vec2d, std::vector<Vec2d> > seed_result = hartigan_wong(5, input);
-		mean = seed_result.first;
-		seed = seed_result.second;
-		centroids = kmeans(5, input, seed);
-
-		//for (int i = 0; i < centroids.size(); ++i) {
-		//	std::cout << centroids[i] << std::endl;
-		//}
 	}
 }
 

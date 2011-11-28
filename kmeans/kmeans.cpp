@@ -13,8 +13,22 @@
 
 using namespace m3d;
 
-Vec2d compare_mean;
+std::vector<Vec2d> random_seed(unsigned int k, const std::vector<Vec2d>& input)
+{
+	std::vector<Vec2d> seed;
 
+	// find random, but unique centroids
+	while (seed.size() < k) {
+		Vec2d centroid = input[rand() % input.size()];
+		if (std::find(seed.begin(), seed.end(), centroid) == seed.end())
+			seed.push_back(centroid);
+	}
+
+	return seed;
+}
+
+// compare distance of vectors to compare_mean
+Vec2d compare_mean;
 bool compare_dist(Vec2d i, Vec2d j)
 {
 	return ((i - compare_mean).lenlen() < (j - compare_mean).lenlen());
@@ -43,7 +57,7 @@ std::pair<Vec2d, std::vector<Vec2d> > hartigan_wong(unsigned int k, const std::v
 }
 
 
-std::vector<Vec2d> kmeans(unsigned int k, const std::vector<Vec2d>& input, const std::vector<Vec2d>& seed)
+std::vector<Vec2d> kmeans(unsigned int iterations, unsigned int k, const std::vector<Vec2d>& input, const std::vector<Vec2d>& seed)
 {
 	std::vector<Vec2d> centroids;
 	std::vector<std::pair<Vec2d, unsigned int> > new_centroids;
@@ -56,7 +70,7 @@ std::vector<Vec2d> kmeans(unsigned int k, const std::vector<Vec2d>& input, const
 		centroids.push_back(seed[i]);
 	}
 
-	for (int iter = 0; iter < ITER_MAX; ++iter) {
+	for (int iter = 0; iter < iterations; ++iter) {
 
 		// find closest centroid for each input vector
 		for (int i = 0; i < input.size(); ++i) {
@@ -95,6 +109,7 @@ std::vector<Vec2d> kmeans(unsigned int k, const std::vector<Vec2d>& input, const
 
 int main(int argc, char** argv)
 {
+	srand(GetTickCount());
 	QApplication app(argc, argv);
 	MainWindow mainwindow(&app);
 
