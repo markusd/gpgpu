@@ -13,6 +13,8 @@
 #include <viewport.hpp>
 #include <qutils.hpp>
 
+#include <voronoi.hpp>
+
 #include <m3d/m3d.hpp>
 
 #include <opengl/shader.hpp>
@@ -113,6 +115,28 @@ void Viewport::resizeGL(int width, int height)
 
 }
 
+
+
+void renderCircle(Vec2f pos, float radius, int precision = 0)
+{
+	if (precision == 0) {
+		precision = radius / 4 * 2;
+		//if (precision > 8)
+		//	precision = 8;
+	}
+
+	glPushMatrix();
+		glTranslatef(pos[0], pos[1], 0);
+		glBegin(GL_LINE_STRIP);
+		for (int i = 0; i < precision; ++i) {
+			glVertex2f(radius * cos(i * PI/precision * 2), radius * sin(i * PI/precision * 2));
+			glVertex2f(radius * cos((i + 1) * PI/precision * 2), radius * sin((i + 1) * PI/precision * 2));
+		}
+		glEnd();
+	glPopMatrix();
+}
+
+
 void Viewport::paintGL()
 {
 	static int frames = 0;
@@ -120,6 +144,14 @@ void Viewport::paintGL()
 
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	float dt = m_clock.get();
+
+	glColor3f(0.75f, 0.75f, 0.75f);
+	renderCircle(Vec2f((float)WIDTH/2.0f, (float)HEIGHT/2.0f), (float)HEIGHT*0.5f);
+	renderCircle(Vec2f((float)WIDTH/2.0f, (float)HEIGHT/2.0f), (float)HEIGHT*0.375f);
+	renderCircle(Vec2f((float)WIDTH/2.0f, (float)HEIGHT/2.0f), (float)HEIGHT*0.25f);
+	renderCircle(Vec2f((float)WIDTH/2.0f, (float)HEIGHT/2.0f), (float)HEIGHT*0.125f);
+	//renderCircle(Vec2f((float)WIDTH/2.0f, (float)HEIGHT/2.0f), (float)HEIGHT*0.0625f);
+	renderCircle(Vec2f((float)WIDTH/2.0f, (float)HEIGHT/2.0f), (float)HEIGHT*0.03125f);
 
 	// input
 	glColor3f(0.0f, 0.0f, 0.0f);
@@ -154,6 +186,29 @@ void Viewport::paintGL()
 	glBegin(GL_POINTS);
 		glVertex2d(m_mean.x * WIDTH, m_mean.y * HEIGHT);
 	glEnd();
+
+	if (m_centroids.size() > 0) {
+		voronoi::Voronoi v;
+		float* xv = new float[m_centroids.size()];
+		float* yv = new float[m_centroids.size()];
+		for (int i = 0; i < m_centroids.size(); ++i) {
+			xv[i] = (float)m_centroids[i].x;
+			yv[i] = (float)m_centroids[i].y;
+		}
+		v.generateVoronoi(xv, yv, m_centroids.size(), 0.0f, 1.0f, 0.0f, 1.0f);
+		
+		v.resetIterator();
+		float x1, x2, y1, y2;
+		glBegin(GL_LINES);
+		while (v.getNext(x1, y1, x2, y2)) {
+			glVertex2f(x1*(float)WIDTH, y1*(float)HEIGHT);
+			glVertex2f(x2*(float)WIDTH, y2*(float)HEIGHT);
+		}
+		glEnd();
+		
+		delete[] xv;
+		delete[] yv;
+	}
 	
 	frames++;
 	if (dt - fps_time >= 1.0f) {

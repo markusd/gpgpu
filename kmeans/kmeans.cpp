@@ -49,9 +49,20 @@ std::pair<Vec2d, std::vector<Vec2d> > hartigan_wong(unsigned int k, const std::v
 	compare_mean = mean;
 	std::sort(sorted.begin(), sorted.end(), compare_dist);
 
-	int gap = sorted.size() / k;
+	//for (int i = 0; i < sorted.size(); ++i)
+	//	std::cout << (sorted[i] - mean).len() << std::endl;
+	//std::cout << std::endl;
+
+	unsigned int gap = (sorted.size() - 1) / std::max<unsigned int>(k - 1, 1);
+	//unsigned int gap = sorted.size() / std::max<unsigned int>(k - 1, 1);
+	//if (gap * (k-1) == sorted.size())
+	//	--gap;
+
 	for (int i = 0; i < k; ++i)
 		seed.push_back(sorted[i*gap]);
+
+	//for (int i = 0; i < seed.size(); ++i)
+	//	std::cout << (seed[i] - mean).len() << std::endl;
 
 	return std::make_pair(mean, seed);
 }
@@ -99,7 +110,10 @@ std::vector<Vec2d> kmeans(unsigned int iterations, unsigned int k, const std::ve
 		}
 
 		for (int i = 0; i < k; ++i) {
-			centroids[i] = new_centroids[i].first * (1.0 / (double)new_centroids[i].second);
+			if (new_centroids[i].second == 0)
+				std::cout << "Cluster is empty" << std::endl;
+			double weight = new_centroids[i].second ? (double)new_centroids[i].second : 1.0;
+			centroids[i] = new_centroids[i].first * (1.0 / weight);
 		}
 
 	}
@@ -110,6 +124,7 @@ std::vector<Vec2d> kmeans(unsigned int iterations, unsigned int k, const std::ve
 int main(int argc, char** argv)
 {
 	srand(GetTickCount());
+
 	QApplication app(argc, argv);
 	MainWindow mainwindow(&app);
 
