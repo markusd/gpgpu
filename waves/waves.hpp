@@ -8,14 +8,23 @@
 #define CPU_FLOAT
 
 // Use OpenCL<->OpenGL interop for direct texture writes from kernels
-//#define GL_INTEROP
+#define GL_INTEROP
 
 // Use a render buffer as target for the kernel
 //#define GL_FBO
 
+// Use CUDA implementation
+#define USE_CUDA
+
+// Use CUDA<->OpenGL interop for direct texture writes from kernels
+#define CUDA_GL_INTEROP
+
 enum ComputationMode {
 	CPU,
 	OPENCL,
+#ifdef USE_CUDA
+	CUDA,
+#endif
 	SHADER
 };
 

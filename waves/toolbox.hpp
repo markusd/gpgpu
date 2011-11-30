@@ -24,6 +24,9 @@ private:
 	QRadioButton* m_cpuButton;
 	QRadioButton* m_shaderButton;
 	QRadioButton* m_openclButton;
+#ifdef USE_CUDA
+	QRadioButton* m_cudaButton;
+#endif
 };
 
 #endif /* TOOLBOX_HPP_ */

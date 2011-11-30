@@ -29,6 +29,13 @@
 #include <CL/cl.hpp>
 #include <opencl/oclutil.hpp>
 
+#ifdef USE_CUDA
+#include <cuda.h>
+#include <cuda_runtime_api.h>
+#include <cuda_gl_interop.h>
+#include <waves.cuh>
+#endif
+
 #include <iostream>
 
 
@@ -61,7 +68,88 @@ cl::BufferRenderGL clRenderBuffer;
 GLuint glFBO;
 GLuint glRB;
 
+#ifdef USE_CUDA
 
+#define MIN(a,b) ((a < b) ? a : b)
+#define MAX(a,b) ((a > b) ? a : b)
+
+// Beginning of GPU Architecture definitions
+inline int _ConvertSMVer2Cores(int major, int minor)
+{
+	// Defines for GPU Architecture types (using the SM version to determine the # of cores per SM
+	typedef struct {
+		int SM; // 0xMm (hexidecimal notation), M = SM Major version, and m = SM minor version
+		int Cores;
+	} sSMtoCores;
+
+	sSMtoCores nGpuArchCoresPerSM[] = 
+	{ { 0x10,  8 },
+	  { 0x11,  8 },
+	  { 0x12,  8 },
+	  { 0x13,  8 },
+	  { 0x20, 32 },
+	  { 0x21, 48 },
+	  {   -1, -1 } 
+	};
+
+	int index = 0;
+	while (nGpuArchCoresPerSM[index].SM != -1) {
+		if (nGpuArchCoresPerSM[index].SM == ((major << 4) + minor) ) {
+			return nGpuArchCoresPerSM[index].Cores;
+		}
+		index++;
+	}
+	printf("MapSMtoCores undefined SMversion %d.%d!\n", major, minor);
+	return -1;
+}
+
+inline int cutGetMaxGflopsDeviceId()
+{
+	int current_device   = 0, sm_per_multiproc = 0;
+	int max_compute_perf = 0, max_perf_device  = 0;
+	int device_count     = 0, best_SM_arch     = 0;
+	cudaDeviceProp deviceProp;
+
+	cudaGetDeviceCount( &device_count );
+	// Find the best major SM Architecture GPU device
+	while ( current_device < device_count ) {
+		cudaGetDeviceProperties( &deviceProp, current_device );
+		if (deviceProp.major > 0 && deviceProp.major < 9999) {
+			best_SM_arch = MAX(best_SM_arch, deviceProp.major);
+		}
+		current_device++;
+	}
+
+    // Find the best CUDA capable GPU device
+	current_device = 0;
+	while( current_device < device_count ) {
+		cudaGetDeviceProperties( &deviceProp, current_device );
+		if (deviceProp.major == 9999 && deviceProp.minor == 9999) {
+		    sm_per_multiproc = 1;
+		} else {
+			sm_per_multiproc = _ConvertSMVer2Cores(deviceProp.major, deviceProp.minor);
+		}
+
+		int compute_perf  = deviceProp.multiProcessorCount * sm_per_multiproc * deviceProp.clockRate;
+		if( compute_perf  > max_compute_perf ) {
+            // If we find GPU with SM major > 2, search only these
+			if ( best_SM_arch > 2 ) {
+				// If our device==dest_SM_arch, choose this, or else pass
+				if (deviceProp.major == best_SM_arch) {	
+					max_compute_perf  = compute_perf;
+					max_perf_device   = current_device;
+				}
+			} else {
+				max_compute_perf  = compute_perf;
+				max_perf_device   = current_device;
+			}
+		}
+		++current_device;
+	}
+	return max_perf_device;
+}
+
+#endif
 
 Viewport::Viewport(QWidget* parent) :
 	QGLWidget(parent)
@@ -81,9 +169,13 @@ Viewport::Viewport(QWidget* parent) :
 #else
 	m_textureData = (float *)malloc(WIDTH * HEIGHT * 3 * sizeof(float));
 #endif
-#ifndef GL_INTEROP
+//#ifndef GL_INTEROP
 	m_clTextureData = (float *)malloc(WIDTH * HEIGHT * 4 * sizeof(float));
-#endif
+//#endif
+
+
+
+
 
 	m_timer = new QTimer(this);
 	connect(m_timer, SIGNAL(timeout()), this, SLOT(updateGL()));
@@ -91,8 +183,8 @@ Viewport::Viewport(QWidget* parent) :
 
 void Viewport::initializeGL()
 {
-	GLenum err = glewInit();
-	if (err != GLEW_OK) {
+	GLenum gerr = glewInit();
+	if (gerr != GLEW_OK) {
 		util::ErrorAdapter::instance().displayErrorMessage("Could not initialize GLEW!");
 		exit(1);
 	}
@@ -115,7 +207,7 @@ void Viewport::initializeGL()
 	m_texture = ogl::__Texture::create();
 	m_texture->setFilter(GL_NEAREST, GL_NEAREST);
 #ifdef GL_INTEROP
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, WIDTH, HEIGHT, 0, GL_RGBA, GL_FLOAT, NULL);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, WIDTH, HEIGHT, 0, GL_RGBA, GL_FLOAT, m_clTextureData);
 #else
 #ifdef CPU_FLOAT
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, WIDTH, HEIGHT, 0, GL_RGB, GL_FLOAT, m_textureData);
@@ -186,9 +278,40 @@ void Viewport::initializeGL()
 		clPos = cl::Buffer(clContext, CL_MEM_READ_ONLY, 32 * 2 * sizeof(float), NULL, &clError);
 		if (clError != CL_SUCCESS) std::cout << "OpenCL Error: Could not create buffer" << std::endl;
 
+
 	} catch (const cl::Error& error) {
 		std::cout << "OpenCL Error 1: " << error.what() << " (" << error.err() << ")" << std::endl;
 	}
+
+	/**
+	 * Setup CUDA
+	 */
+
+#ifdef USE_CUDA
+
+#ifndef CUDA_GL_INTEROP
+	cudaError_t err = cudaSetDevice(cutGetMaxGflopsDeviceId());
+	std::cout << cudaGetErrorString( err ) << std::endl;
+#else
+	cudaError_t err = cudaGLSetGLDevice(cutGetMaxGflopsDeviceId());
+	std::cout << cudaGetErrorString( err ) << std::endl;
+#endif
+
+	//m_cuHostTextureData = (float *)malloc(WIDTH * HEIGHT * 4 * sizeof(float));
+	cudaMallocHost((void**)&m_cuHostTextureData, WIDTH * HEIGHT * 4 * sizeof(float));
+
+	m_cuTexture = ogl::__Texture::create();
+	m_cuTexture->setFilter(GL_NEAREST, GL_NEAREST);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F_ARB, WIDTH, HEIGHT, 0, GL_RGBA, GL_FLOAT, m_cuHostTextureData);
+
+#ifdef CUDA_GL_INTEROP
+	err = cudaGraphicsGLRegisterImage(&m_cuTextureResource, m_cuTexture->m_textureID, GL_TEXTURE_2D, cudaGraphicsRegisterFlagsWriteDiscard);
+	std::cout << cudaGetErrorString( err ) << std::endl;
+#endif
+
+	cudaMalloc((void**)&m_cuTextureData, WIDTH * HEIGHT * 4 * sizeof(float));
+	cudaMalloc((void**)&m_cuPosData, 32 * 2 * sizeof(float));
+#endif
 
 	// create shader and kernel
 	createKernel();
@@ -240,10 +363,15 @@ void Viewport::paintGL()
 			glCallList(m_displayList);
 #endif
 			break;
+#ifdef USE_CUDA
+		case CUDA:
+			createTextureCuda(dt);
+			glCallList(m_displayList);
+			break;
+#endif
 	}
 
-	
-	
+
 	frames++;
 	if (dt - fps_time >= 1.0f) {
 		//std::cout << dt << ", " << fps_time << ", " << frames << std::endl;
@@ -410,6 +538,32 @@ void Viewport::createTextureCPU(float dt)
 	//glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, WIDTH, HEIGHT, 0, GL_RGB, GL_FLOAT, m_textureData);
 }
 
+#ifdef USE_CUDA
+void Viewport::createTextureCuda(float dt)
+{
+#ifdef CUDA_GL_INTEROP
+	cuda_launch_waves(m_cuTextureData, WIDTH, dt, m_waves.size(), m_cuPosData);
+
+	cudaError_t err = cudaGraphicsMapResources(1, &m_cuTextureResource, 0);
+	cudaArray *in_array;
+
+	err = cudaGraphicsSubResourceGetMappedArray(&in_array, m_cuTextureResource, 0, 0);
+	//std::cout << cudaGetErrorString(err) << std::endl;
+	err = cudaMemcpyToArray(in_array, 0, 0, m_cuTextureData, WIDTH * HEIGHT * sizeof(float) * 4, cudaMemcpyDeviceToDevice);
+	err = cudaGraphicsUnmapResources(1, &m_cuTextureResource, 0);
+
+	glEnable(GL_TEXTURE_2D);
+	m_cuTexture->bind();
+#else
+	cuda_launch_waves(m_cuTextureData, WIDTH, dt, m_waves.size(), m_cuPosData);
+	cudaMemcpy(m_cuHostTextureData, m_cuTextureData, WIDTH * HEIGHT * 4 * sizeof(float), cudaMemcpyDeviceToHost);
+	glEnable(GL_TEXTURE_2D);
+	m_cuTexture->bind();
+	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, WIDTH, HEIGHT, GL_RGBA, GL_FLOAT, m_cuHostTextureData);
+#endif
+}
+#endif
+
 void Viewport::setComputationMode(ComputationMode mode)
 {
 	if (m_mode == mode)
@@ -440,6 +594,13 @@ void Viewport::setComputationMode(ComputationMode mode)
 		if (err != GL_NO_ERROR)
 			std::cout << "setComputationMode: " << gluErrorString(err) << std::endl;
 	}
+#ifdef USE_CUDA
+	else if  (m_mode == CUDA) {
+		glEnable(GL_TEXTURE_2D);
+		m_cuTexture->bind();
+		ogl::__Shader::unbind();
+	}
+#endif
 }
 
 void Viewport::mouseMove(int x, int y)
@@ -474,6 +635,10 @@ void Viewport::mouseButton(util::Button button, bool down, int x, int y)
 		} catch (const cl::Error& error) {
 			std::cout << "OpenCL Error 3: " << error.what() << " (" << error.err() << ")" << std::endl;
 		}
+
+#ifdef USE_CUDA
+		cudaMemcpy(m_cuPosData, &m_waves[0], m_waves.size() * 2 * sizeof(float), cudaMemcpyHostToDevice);
+#endif
 
 		if (m_mode != SHADER)
 			ogl::__Shader::unbind();

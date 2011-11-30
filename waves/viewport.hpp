@@ -11,6 +11,12 @@
 #include <QtCore/QTimer>
 #include <m3d/m3d.hpp>
 
+#ifdef USE_CUDA
+#include <cuda.h>
+#include <cuda_runtime_api.h>
+#include <cuda_gl_interop.h>
+#endif
+
 class QTimer;
 
 class Viewport: public QGLWidget, public util::MouseListener {
@@ -52,6 +58,16 @@ public:
 #endif
 	float* m_clTextureData;
 
+#ifdef USE_CUDA
+	ogl::Texture m_cuTexture;
+	float* m_cuHostTextureData;
+	float* m_cuTextureData;
+	float* m_cuPosData;
+#ifdef CUDA_GL_INTEROP
+	cudaGraphicsResource* m_cuTextureResource;
+#endif
+#endif
+
 	QTimer* m_timer;
 	
 	QtMouseAdapter m_mouseAdapter;
@@ -61,6 +77,9 @@ public:
 	void createShader();
 	void createTextureCPU(float dt);
 	void createTextureOpenCL(float dt);
+#ifdef USE_CUDA
+	void createTextureCuda(float dt);
+#endif
 
 	virtual void mouseMove(int x, int y);
 	virtual void mouseButton(util::Button button, bool down, int x, int y);
