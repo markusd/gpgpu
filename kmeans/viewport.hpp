@@ -41,6 +41,7 @@ public:
 	// input parameters
 	int m_k;
 	int m_iterations;
+	int m_runs;
 	SeedingAlgorithm m_seedingAlgorithm;
 
 
@@ -55,7 +56,10 @@ public slots:
 	void setSeedingAlgorithm(SeedingAlgorithm s);
 	void setK(int i) { m_k = i; };
 	void setIterations(int i) { m_iterations = i; };
+	void setRuns(int i) { m_runs = i; };
 	void doCluster();
+	void doClear();
+	void doClearSeed();
 signals:
 	void framesPerSecondChanged(int);
 };

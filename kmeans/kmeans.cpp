@@ -13,6 +13,12 @@
 
 using namespace m3d;
 
+/* distance functions */
+double euclidian_distance(Vec2d a, Vec2d b)
+{
+	return (a - b).len();
+}
+
 std::vector<Vec2d> random_seed(unsigned int k, const std::vector<Vec2d>& input)
 {
 	std::vector<Vec2d> seed;
@@ -68,9 +74,11 @@ std::pair<Vec2d, std::vector<Vec2d> > hartigan_wong(unsigned int k, const std::v
 }
 
 
-std::vector<Vec2d> kmeans(unsigned int iterations, unsigned int k, const std::vector<Vec2d>& input, const std::vector<Vec2d>& seed)
+std::pair<std::vector<Vec2d>, double> kmeans(unsigned int iterations, unsigned int k, const std::vector<Vec2d>& input, const std::vector<Vec2d>& seed)
 {
 	std::vector<Vec2d> centroids;
+
+	// centroid vector --> number of assigned input vectors
 	std::vector<std::pair<Vec2d, unsigned int> > new_centroids;
 
 	// input-id --> centroid-id
@@ -82,6 +90,8 @@ std::vector<Vec2d> kmeans(unsigned int iterations, unsigned int k, const std::ve
 	}
 
 	for (int iter = 0; iter < iterations; ++iter) {
+
+		double cost = 0.0;
 
 		// find closest centroid for each input vector
 		for (int i = 0; i < input.size(); ++i) {
@@ -95,7 +105,13 @@ std::vector<Vec2d> kmeans(unsigned int iterations, unsigned int k, const std::ve
 					min_dist = dist;
 				}
 			}
+
+			cost += (input[i] - centroids[dist_mapping[i]]).lenlen();
 		}
+
+		// normalize cost
+		cost /= (double)input.size();
+		std::cout << "Iter " << iter << ": cost = " << cost << std::endl;
 
 		// initialize new centroids
 		new_centroids.clear();
@@ -103,12 +119,14 @@ std::vector<Vec2d> kmeans(unsigned int iterations, unsigned int k, const std::ve
 			new_centroids.push_back(std::make_pair(Vec2d(0.0, 0.0), 0));
 
 
+		// compute cumulated centroids position and the number of assigned input vectors
 		for (std::map<unsigned int, unsigned int>::iterator itr = dist_mapping.begin();
 			itr != dist_mapping.end(); ++itr) {
 				new_centroids[itr->second].first += input[itr->first];
 				++new_centroids[itr->second].second;
 		}
 
+		// weight (normalize) the new centroids
 		for (int i = 0; i < k; ++i) {
 			if (new_centroids[i].second == 0)
 				std::cout << "Cluster is empty" << std::endl;
@@ -118,7 +136,32 @@ std::vector<Vec2d> kmeans(unsigned int iterations, unsigned int k, const std::ve
 
 	}
 
-	return centroids;
+
+	// compute final cost
+
+	double cost = 0.0;
+
+	// find closest centroid for each input vector
+	for (int i = 0; i < input.size(); ++i) {
+
+		double min_dist = std::numeric_limits<double>::max();
+
+		for (int j = 0; j < k; j++) {
+			double dist = (input[i] - centroids[j]).len();
+			if (dist < min_dist) {
+				dist_mapping[i] = j;
+				min_dist = dist;
+			}
+		}
+
+		cost += (input[i] - centroids[dist_mapping[i]]).lenlen();
+	}
+
+	// normalize cost
+	cost /= (double)input.size();
+	std::cout << "Final cost = " << cost << std::endl;
+
+	return std::make_pair(centroids, cost);
 }
 
 int main(int argc, char** argv)

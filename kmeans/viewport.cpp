@@ -77,7 +77,8 @@ Viewport::Viewport(QWidget* parent) :
 	setMaximumHeight(HEIGHT);
 
 	m_k = 1;
-	m_iterations = 10;
+	m_iterations = 1;
+	m_runs = 1;
 	m_seedingAlgorithm = RANDOM;
 
 	m_timer = new QTimer(this);
@@ -219,13 +220,14 @@ void Viewport::paintGL()
 	}
 }
 
+bool res_compare_func(const std::pair<std::vector<Vec2d>, std::pair<std::vector<Vec2d>, double> >& a,
+					  const std::pair<std::vector<Vec2d>, std::pair<std::vector<Vec2d>, double> >& b)
+{
+	return a.second.second < b.second.second;
+}
+
 void Viewport::doCluster()
 {
-	//for (int i = 0; i < INPUT_SIZE; ++i) {
-	//	input.push_back(Vec2d(((double)(rand()%10000)/10000.0), ((double)(rand()%10000)/10000.0)));
-	//	std::cout << input[i] << std::endl;
-	//}
-
 	if (m_input.size() < m_k) {
 		QMessageBox msgBox;
 		msgBox.setText("Error: The input size is smaller than the number of clusters.");
@@ -233,28 +235,52 @@ void Viewport::doCluster()
 		return;
 	}
 
+	if (m_seedingAlgorithm == MANUAL && m_seed.size() != m_k) {
+		QMessageBox msgBox;
+		msgBox.setText("Error: The number of seeds does not equal the number of clusters.");
+		msgBox.exec();
+		return;
+	}
+
+	// (seed, (centroid, cost))[]
+	std::vector<std::pair<std::vector<Vec2d>, std::pair<std::vector<Vec2d>, double> > > results;
+	std::pair<std::vector<Vec2d>, double> result;
+
+	// hide mean
+	m_mean = Vec2d(-100.0, -100.0);
+
 	switch (m_seedingAlgorithm) {
 		case RANDOM:
-			// hide mean
-			m_mean = Vec2d(-100.0, -100.0);
-			m_seed = random_seed(m_k, m_input);
+			
+			for (int i = 0; i < m_runs; ++i) {
+				m_seed = random_seed(m_k, m_input);
+
+				// run kmeans
+				results.push_back(std::make_pair(m_seed, kmeans(m_iterations, m_k, m_input, m_seed)));
+				
+			}
+
+			std::sort(results.begin(), results.end(), res_compare_func);
+			m_seed = results.front().first;
+			m_centroids = results.front().second.first;
 			break;
 
 		case MANUAL:
+			// run kmeans
+			result = kmeans(m_iterations, m_k, m_input, m_seed);
+			m_centroids = result.first;
 			break;
 
 		case HARTIGAN_WONG:
 			std::pair<Vec2d, std::vector<Vec2d> > seed_result = hartigan_wong(m_k, m_input);
 			m_mean = seed_result.first;
 			m_seed = seed_result.second;
+
+			// run kmeans
+			result = kmeans(m_iterations, m_k, m_input, m_seed);
+			m_centroids = result.first;
 			break;
 	}
-	
-	m_centroids = kmeans(m_iterations, m_k, m_input, m_seed);
-
-	//for (int i = 0; i < centroids.size(); ++i) {
-	//	std::cout << centroids[i] << std::endl;
-	//}
 }
 
 void Viewport::setSeedingAlgorithm(SeedingAlgorithm s)
@@ -262,20 +288,46 @@ void Viewport::setSeedingAlgorithm(SeedingAlgorithm s)
 	m_seedingAlgorithm = s;
 }
 
+void Viewport::doClear()
+{
+	m_mean = Vec2d(-100.0, -100.0);
+	m_input.clear();
+	m_centroids.clear();
+	m_seed.clear();
+}
+
+void Viewport::doClearSeed()
+{
+	m_mean = Vec2d(-100.0, -100.0);
+	m_seed.clear();
+	m_centroids.clear();
+}
+
 
 void Viewport::mouseMove(int x, int y)
 {
+	static int lx = 0;
+	static int ly = 0;
+
+	if (abs(lx - x) > 1 || abs(ly - y) > 1) {
+		if (m_mouseAdapter.isDown(util::MIDDLE)) {
+			m_input.push_back(Vec2d((double)x / (double)WIDTH, ((double)HEIGHT - (double)y) / (double)HEIGHT));
+		}
+		lx = x;
+		ly = y;
+	}
 }
 
 void Viewport::mouseButton(util::Button button, bool down, int x, int y)
 {
+	// left button --> add input vector
 	if (button == util::LEFT && !down) {
 		m_input.push_back(Vec2d((double)x / (double)WIDTH, ((double)HEIGHT - (double)y) / (double)HEIGHT));
 	}
 
+	// right button --> add seed
 	if (button == util::RIGHT && !down) {
-
-
+		m_seed.push_back(Vec2d((double)x / (double)WIDTH, ((double)HEIGHT - (double)y) / (double)HEIGHT));
 	}
 }
 

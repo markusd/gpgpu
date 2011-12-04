@@ -47,6 +47,9 @@ MainWindow::MainWindow(QApplication* app)
 	connect(m_toolBox->m_doClusterButton, SIGNAL(clicked()), m_viewport, SLOT(doCluster()));
 	connect(m_toolBox->m_kBox, SIGNAL(valueChanged(int)), m_viewport, SLOT(setK(int)));
 	connect(m_toolBox->m_iterationsBox, SIGNAL(valueChanged(int)), m_viewport, SLOT(setIterations(int)));
+	connect(m_toolBox->m_runBox, SIGNAL(valueChanged(int)), m_viewport, SLOT(setRuns(int)));
+	connect(m_toolBox->m_clearButton, SIGNAL(clicked()), m_viewport, SLOT(doClear()));
+	connect(m_toolBox->m_clearSeedButton, SIGNAL(clicked()), m_viewport, SLOT(doClearSeed()));
 	
 	show();
 	this->adjustSize();
