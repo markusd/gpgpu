@@ -5,12 +5,13 @@
  */
 
 #include <waves.hpp>
-#include <mainwindow.hpp>
 
+#include <mainwindow.hpp>
 #include <QtGui/QApplication>
 
 #include <iostream>
 
+#ifndef USE_DIRECT_COMPUTE
 int main(int argc, char **argv)
 {
 	QApplication app(argc, argv);
@@ -19,3 +20,4 @@ int main(int argc, char **argv)
 	int result = app.exec();
 	return result;
 }
+#endif

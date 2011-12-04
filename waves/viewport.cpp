@@ -41,8 +41,7 @@
 
 using namespace m3d;
 
-#define WIDTH 512
-#define HEIGHT 512
+
 
 // OpenCL vars
 /*
