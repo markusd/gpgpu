@@ -24,6 +24,7 @@
 #include <CL/cl.hpp>
 #include <opencl/oclutil.hpp>
 
+#include <util/tostring.hpp>
 #include <util/clock.hpp>
 
 const int DIM = 1024;
@@ -96,6 +97,18 @@ void initCL()
 	std::ifstream t("kmeans.cl");
 	std::string code((std::istreambuf_iterator<char>(t)), std::istreambuf_iterator<char>());
 
+	std::string header = "#define DIM ";
+	header +=  util::toString(DIM);
+	header += "\n";
+	header += "#define K ";
+	header += util::toString(K);
+	header += "\n";
+	header += "#define N ";
+	header += util::toString(N);
+	header += "\n\n\n";
+
+	code = header + code;
+
 	try {
 		cl::Program::Sources source(1, std::make_pair(code.c_str(), code.size()));
 		clProgram = cl::Program(clContext, source);
@@ -161,13 +174,16 @@ int main(int argc, char** argv)
 	clMeanBuf = cl::Buffer(clContext, CL_MEM_WRITE_ONLY | CL_MEM_USE_HOST_PTR, N * sizeof(int), mean, &clError);
 	if (clError != CL_SUCCESS) std::cout << "OpenCL Error: Could not create buffer" << std::endl;
 
-	clClusterAssignment.setArgs(clInputBuf(), DIM, N, clCentroidBuf(), K, clMappingBuf());
-	clComputeMean.setArgs(clInputBuf(), DIM, N, clMeanBuf());
+	clClusterAssignment.setArgs(clInputBuf(), clCentroidBuf(), clMappingBuf());
+	clComputeMean.setArgs(clInputBuf(), clMeanBuf());
 
 	clock.reset();
 
 	clQueue.enqueueWriteBuffer(clInputBuf, CL_FALSE, 0, N * DIM * sizeof(float), (void*)input, NULL, NULL);
-	clQueue.enqueueWriteBuffer(clCentroidBuf, CL_FALSE, 0, K * DIM * sizeof(float), (void*)centroids, NULL, NULL); 
+	clQueue.enqueueWriteBuffer(clCentroidBuf, CL_TRUE, 0, K * DIM * sizeof(float), (void*)centroids, NULL, NULL); 
+
+	time = clock.get();
+	std::cout << time << std::endl;
 
 	clQueue.enqueueNDRangeKernel(clComputeMean, cl::NullRange, cl::NDRange(DIM), cl::NDRange(16), NULL, NULL);
 	
@@ -182,7 +198,7 @@ int main(int argc, char** argv)
 	clock.reset();
 
 	cluster_assignment(input, DIM, N, centroids, K, mapping_);
-	//compute_mean(input, DIM, N, mean_);
+	compute_mean(input, DIM, N, mean_);
 
 	time = clock.get();
 	std::cout << time << std::endl;
@@ -199,6 +215,7 @@ int main(int argc, char** argv)
 	for (int i = 0; i < DIM; ++i) {
 		if (absf((*mean)[i] - (*mean_)[i]) > 0.1f) {
 			std::cout << "Error mean" << std::endl;
+			break;
 		}
 	}
 	
