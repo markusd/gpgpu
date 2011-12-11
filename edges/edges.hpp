@@ -2,7 +2,7 @@
 #define EDGES_HPP_
 
 #define USE_CUDA
-//#define USE_SHARED
+#define USE_SHARED
 //#define USE_FLOAT
 
 #ifdef USE_FLOAT

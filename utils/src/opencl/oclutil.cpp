@@ -22,6 +22,7 @@ bool createContext(cl_device_type type, cl_context_properties glContext, cl_cont
 			std::cout << "Platform found " << info << ". Press '1' to use or '0' to see the next. " << std::endl;
 			platform = platforms[i];
 			std::cin >> use;
+			std::cin.get();
 			std::cout << use << std::endl;
 			if (use) break;
 		}
