@@ -73,6 +73,84 @@ std::pair<Vec2d, std::vector<Vec2d> > hartigan_wong(unsigned int k, const std::v
 	return std::make_pair(mean, seed);
 }
 
+bool second_sort(std::pair<unsigned int, unsigned int> p1, std::pair<unsigned int, unsigned int> p2) {
+	return p1.second > p2.second;
+}
+
+std::vector<Vec2d> astrahan(unsigned int k, const std::vector<Vec2d>& input) {
+	// vec id - density
+	std::vector<std::pair<unsigned int, unsigned int> > densities;
+	//vec id, vec id - distance
+	std::vector<std::vector<double> > distances;
+
+	distances.reserve(input.size());
+	distances.resize(input.size());
+
+	// initialize
+	for(int h = 0; h < input.size(); ++h) {
+		densities.push_back(std::make_pair(h, 0));
+	}
+
+	// get all distance pairs
+	double distance_mean = 0.0;
+	for(int i = 0; i < input.size(); ++i) {
+		distances[i].reserve(input.size());
+		distances[i].resize(input.size());
+		for(int j = 0; j < input.size(); ++j){
+			distances[i][j] = euclidian_distance(input[i],input[j]);
+			distance_mean += distances[i][j];
+		}
+	}
+	
+	distance_mean = distance_mean/(input.size()*input.size());
+
+	for(int i = 0; i < input.size(); ++i){
+		for(int j = 0; j < input.size(); ++j) {
+			if(distances[i][j] <= distance_mean)
+					densities[i].second++;
+		}
+	}
+
+	printf("%f\n", distance_mean);
+	
+	std::sort(densities.begin(), densities.end(), second_sort);
+	
+	std::vector< std::pair<unsigned int, unsigned int> > tmp_result;
+	tmp_result.push_back(densities.front());
+
+	for(int i = 1; i < densities.size(); ++i){
+		bool inside = true;
+		for(int j = 0; j < tmp_result.size(); ++j) {
+			if(euclidian_distance(input[densities[i].first], input[tmp_result[j].first]) > distance_mean) {
+				inside = false;
+			} else {
+				inside = true;
+				break;
+			}
+		}
+		if(!inside)
+			tmp_result.push_back(densities[i]);
+		if(tmp_result.size() == k)
+			break;
+	}
+
+	std::vector<Vec2d> result;// = random_seed(k, input);
+	if(tmp_result.size() == k){
+		for(int i = 0; i < k; ++i){
+			result.push_back(input[tmp_result[i].first]);
+		}
+	} else {
+		for(int i = 0; i < tmp_result.size(); ++i) {
+			result.push_back(input[tmp_result[i].first]);
+		}
+		while(result.size() < k) {
+			result.push_back(input[densities.back().first]);
+			densities.pop_back();
+		}
+	}
+
+	return result;
+}
 
 std::pair<std::vector<Vec2d>, double> kmeans(unsigned int iterations, unsigned int k, const std::vector<Vec2d>& input, const std::vector<Vec2d>& seed)
 {

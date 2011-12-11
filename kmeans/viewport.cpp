@@ -247,6 +247,14 @@ void Viewport::doCluster()
 			m_centroids = result.first;
 			break;
 
+		case ASTRAHAN:
+			m_seed = astrahan(m_k, m_input);
+
+			// run kmeans
+			result = kmeans(m_iterations, m_k, m_input, m_seed);
+			m_centroids = result.first;
+			break;
+
 		case HARTIGAN_WONG:
 			std::pair<Vec2d, std::vector<Vec2d> > seed_result = hartigan_wong(m_k, m_input);
 			m_mean = seed_result.first;

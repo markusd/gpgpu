@@ -13,7 +13,8 @@ using namespace m3d;
 typedef enum SeedingAlgorithm { 
 	RANDOM,
 	MANUAL,
-	HARTIGAN_WONG
+	HARTIGAN_WONG,
+	ASTRAHAN
 };
 
 /* distance functions */
@@ -25,6 +26,7 @@ double euclidian_distance(Vec2d a, Vec2d b);
 /* Seeding algorithms */
 std::vector<Vec2d> random_seed(unsigned int k, const std::vector<Vec2d>& input);
 std::pair<Vec2d, std::vector<Vec2d> > hartigan_wong(unsigned int k, const std::vector<Vec2d>& input);
+std::vector<Vec2d> astrahan(unsigned int k, const std::vector<Vec2d>& input);
 
 /**
  * kmeans algorithm
