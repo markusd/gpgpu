@@ -55,7 +55,7 @@ __kernel void cluster_assignment(__global float* input, __global float* centroid
 	mapping[id] = cid;
 }
 
-__kernel void cluster_reposition(__global float* input, __global float* centroids, __global int* mapping, __global float* new_centroids)
+__kernel void cluster_reposition(__global float* input, __global int* mapping, __global float* new_centroids)
 {
 	int id = get_global_id(0);
 
@@ -63,8 +63,10 @@ __kernel void cluster_reposition(__global float* input, __global float* centroid
 	float count[K];
 
 #pragma unroll
-	for (int i = 0; i < K; ++i)
+	for (int i = 0; i < K; ++i) {
 		comp[i] = 0.0f;
+		count[i] = 0.0f;
+	}
 
 	for (int i = 0; i < N; ++i) {
 		comp[mapping[i]] += input[i*DIM+id];
