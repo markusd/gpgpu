@@ -26,6 +26,7 @@ public:
 	QRadioButton* m_randomButton;
 	QRadioButton* m_manualButton;
 	QRadioButton* m_hartiganWongButton;
+	QRadioButton* m_astrahanButton;
 
 	QGroupBox* m_parametersGroup;
 	QSpinBox* m_kBox;

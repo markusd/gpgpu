@@ -21,17 +21,20 @@ ToolBox::ToolBox(QWidget *parent)
 	m_randomButton = new QRadioButton("Random");
 	m_manualButton = new QRadioButton("Manual");
 	m_hartiganWongButton = new QRadioButton("Hartigan Wong");
+	m_astrahanButton = new QRadioButton("Astrahan");
 	m_randomButton->setChecked(true);
 
 	connect(m_randomButton, SIGNAL(clicked()), this, SLOT(seedingAlgorithmChanged()));
 	connect(m_manualButton, SIGNAL(clicked()), this, SLOT(seedingAlgorithmChanged()));
 	connect(m_hartiganWongButton, SIGNAL(clicked()), this, SLOT(seedingAlgorithmChanged()));
+	connect(m_astrahanButton, SIGNAL(clicked()), this, SLOT(seedingAlgorithmChanged()));
 
 
 	QVBoxLayout* group_layout = new QVBoxLayout();
 	group_layout->addWidget(m_randomButton);
 	group_layout->addWidget(m_manualButton);
 	group_layout->addWidget(m_hartiganWongButton);
+	group_layout->addWidget(m_astrahanButton);
 	group_layout->addStretch(1);
 
 	m_seedingGroup->setLayout(group_layout);
@@ -85,6 +88,9 @@ void ToolBox::seedingAlgorithmChanged()
 	} else if (m_hartiganWongButton->isChecked()) {
 		m_runBox->hide();
 		s = HARTIGAN_WONG;
+	} else if (m_astrahanButton->isChecked()) {
+		m_runBox->hide();
+		s = ASTRAHAN;
 	}
 	
 	emit setSeedingAlgorithm(s);
