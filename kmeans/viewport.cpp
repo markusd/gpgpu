@@ -40,30 +40,6 @@ using namespace m3d;
 #define WIDTH 768
 #define HEIGHT 768
 
-// OpenCL vars
-/*
-cl_platform_id clPlatform;
-cl_device_id clDevice;
-cl_context clContext;
-cl_command_queue clQueue;
-cl_program clProgram;
-cl_kernel clKernel;
-*/
-
-cl::Platform clPlatform;
-std::vector<cl::Device> clDevices;
-cl::Context clContext;
-cl::CommandQueue clQueue;
-cl::Program clProgram;
-cl::Kernel clKernel;
-cl::Buffer clOut;
-cl::Image2DGL clTexture;
-cl::Buffer clPos;
-cl::BufferRenderGL clRenderBuffer;
-
-GLuint glFBO;
-GLuint glRB;
-
 
 Viewport::Viewport(QWidget* parent) :
 	QGLWidget(parent)

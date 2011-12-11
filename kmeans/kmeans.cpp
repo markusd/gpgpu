@@ -164,6 +164,8 @@ std::pair<std::vector<Vec2d>, double> kmeans(unsigned int iterations, unsigned i
 	return std::make_pair(centroids, cost);
 }
 
+#ifdef USE_VISUALIZATION
+
 int main(int argc, char** argv)
 {
 	srand(GetTickCount());
@@ -174,3 +176,5 @@ int main(int argc, char** argv)
 	int result = app.exec();
 	return result;
 }
+
+#endif /* USE_VISUALIZATION */

@@ -5,10 +5,10 @@
 #include <vector>
 #include <map>
 
-using namespace m3d;
+#define __CL_ENABLE_EXCEPTIONS
+//#define USE_VISUALIZATION
 
-//#define INPUT_SIZE 512
-//#define ITER_MAX 100
+using namespace m3d;
 
 typedef enum SeedingAlgorithm { 
 	RANDOM,
