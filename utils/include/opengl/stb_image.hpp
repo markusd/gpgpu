@@ -8,7 +8,7 @@
 #ifndef STB_IMAGE_HPP_
 #define STB_IMAGE_HPP_
 
-#define STBI_HEADER_FILE_ONLY
+//#define STBI_HEADER_FILE_ONLY
 #include "stb_image.c"
 
 #endif /* STB_IMAGE_HPP_ */
