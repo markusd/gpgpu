@@ -56,6 +56,7 @@ template<typename T> class Quat;
 typedef Quat<float> Quatf;
 typedef Quat<double> Quatd;
 
+#include "vec.hpp"
 #include "vec2.hpp"
 #include "vec3.hpp"
 #include "vec4.hpp"
