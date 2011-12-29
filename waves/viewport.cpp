@@ -319,6 +319,10 @@ void Viewport::initializeGL()
 	ogl::__Shader::unbind();
 
 	m_clock.reset();
+
+
+	mouseButton(util::LEFT, false, 0, HEIGHT/2);
+	mouseButton(util::LEFT, false, WIDTH-1, HEIGHT/2);
 }
 
 void Viewport::resizeGL(int width, int height)

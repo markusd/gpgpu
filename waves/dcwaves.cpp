@@ -8,6 +8,10 @@
 #include <util/tostring.hpp>
 #include <util/clock.hpp>
 
+#include <stdio.h>
+#include <io.h>
+#include <fcntl.h>
+
 using namespace m3d;
 
 #define IDI_TUTORIAL1           107
@@ -52,10 +56,16 @@ ID3D11InputLayout*      g_pVertexLayout = NULL;
 ID3D11Buffer*           g_pVertexBuffer = NULL;
 ID3D11Buffer*           g_pCBWaveDesc = NULL;
 ID3D11Buffer*           g_pCBWaveData = NULL;
+ID3D11ComputeShader*	g_pCSWaves = NULL;
+ID3D11Texture2D*		g_pTexture = NULL;
+ID3D11UnorderedAccessView* g_pTextureView = NULL;
+ID3D11ShaderResourceView* g_pTextureResourceView = NULL;
+ID3D11SamplerState* g_pSamplerLinear = NULL;
 
 util::Clock g_clock;
 CBWaveDesc g_cbWaveDesc;
 CBWaveData g_cbWaveData;
+float* texData = NULL;
 
 
 //--------------------------------------------------------------------------------------
@@ -77,6 +87,51 @@ int WINAPI wWinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdL
 {
     UNREFERENCED_PARAMETER( hPrevInstance );
     UNREFERENCED_PARAMETER( lpCmdLine );
+
+	    AllocConsole();
+
+    HANDLE handle_out = GetStdHandle(STD_OUTPUT_HANDLE);
+    int hCrt = _open_osfhandle((long) handle_out, _O_TEXT);
+    FILE* hf_out = _fdopen(hCrt, "w");
+    setvbuf(hf_out, NULL, _IONBF, 1);
+    *stdout = *hf_out;
+
+    HANDLE handle_in = GetStdHandle(STD_INPUT_HANDLE);
+    hCrt = _open_osfhandle((long) handle_in, _O_TEXT);
+    FILE* hf_in = _fdopen(hCrt, "r");
+    setvbuf(hf_in, NULL, _IONBF, 128);
+    *stdin = *hf_in;
+
+	
+	//int w, h, c;
+	//unsigned char* in_data = stbi_load("tex.bmp", &w, &h, &c, STBI_rgb_alpha);
+
+	//if (!in_data) {
+	//	std::cout << "Error: Could not read input file" << std::endl;
+	//	return 1;
+	//}
+
+	int w = WIDTH;
+	int h = HEIGHT;
+	texData = new float[WIDTH * WIDTH*4];
+
+	for (int x = 0; x < w; ++x) {
+		for (int y = 0; y < h; ++y) {
+
+			
+			//unsigned char R = (x / (float)WIDTH * 255);
+			//unsigned char G = (y / (float)HEIGHT * 255);
+			//unsigned char B = R + G;
+			//unsigned char A = 255;
+
+			//texData[x+y*w] = x + y;
+			texData[(x+y*w)*4+0] = x / (float)WIDTH;//in_data[(x+y*w)*4+0] / 255.0f;
+			texData[(x+y*w)*4+1] = y / (float)HEIGHT;//in_data[(x+y*w)*4+1] / 255.0f;
+			texData[(x+y*w)*4+2] = texData[(x+y*w)*4+0] + texData[(x+y*w)*4+1];//in_data[(x+y*w)*4+2] / 255.0f;
+			texData[(x+y*w)*4+3] = 1.0f;//in_data[(x+y*w)*4+3] / 255.0f;
+		}
+	}
+
 
     if( FAILED( InitWindow( hInstance, nCmdShow ) ) )
         return 0;
@@ -157,13 +212,13 @@ HRESULT CompileShaderFromFile( WCHAR* szFileName, LPCSTR szEntryPoint, LPCSTR sz
 {
     HRESULT hr = S_OK;
 
-    DWORD dwShaderFlags = D3DCOMPILE_ENABLE_STRICTNESS;
+    DWORD dwShaderFlags = 0;// D3DCOMPILE_ENABLE_STRICTNESS;
 #if defined( DEBUG ) || defined( _DEBUG )
     // Set the D3DCOMPILE_DEBUG flag to embed debug information in the shaders.
     // Setting this flag improves the shader debugging experience, but still allows 
     // the shaders to be optimized and to run exactly the way they will run in 
     // the release configuration of this program.
-    //dwShaderFlags |= D3DCOMPILE_DEBUG;
+    dwShaderFlags |= D3DCOMPILE_DEBUG;
 #endif
 
     ID3DBlob* pErrorBlob;
@@ -173,7 +228,9 @@ HRESULT CompileShaderFromFile( WCHAR* szFileName, LPCSTR szEntryPoint, LPCSTR sz
     if( FAILED(hr) )
     {
         if( pErrorBlob != NULL )
-            OutputDebugStringA( (char*)pErrorBlob->GetBufferPointer() );
+			MessageBoxA( NULL,
+                   (char*)pErrorBlob->GetBufferPointer() , "Error", MB_OK );
+            //OutputDebugStringA( (char*)pErrorBlob->GetBufferPointer() );
         if( pErrorBlob ) pErrorBlob->Release();
         return hr;
     }
@@ -197,7 +254,7 @@ HRESULT InitDevice()
 
     UINT createDeviceFlags = 0;
 #ifdef _DEBUG
-    //createDeviceFlags |= D3D11_CREATE_DEVICE_DEBUG;
+    createDeviceFlags |= D3D11_CREATE_DEVICE_DEBUG;
 #endif
 
     D3D_DRIVER_TYPE driverTypes[] =
@@ -264,13 +321,83 @@ HRESULT InitDevice()
     vp.TopLeftY = 0;
     g_pImmediateContext->RSSetViewports( 1, &vp );
 
-    // Compile the vertex shader
-    ID3DBlob* pVSBlob = NULL;
-    hr = CompileShaderFromFile( L"waves.fx", "VS", "vs_5_0", &pVSBlob );
+	// Compile the compute shader
+	ID3DBlob* pCSBlob = NULL;
+	hr = CompileShaderFromFile(L"dcwaves.fx", "CSWaves", "cs_5_0", &pCSBlob);
     if( FAILED( hr ) )
     {
         MessageBox( NULL,
-                    L"The FX file cannot be compiled.  Please run this executable from the directory that contains the FX file.", L"Error", MB_OK );
+                    L"The CSFX file cannot be compiled.  Please run this executable from the directory that contains the FX file.", L"Error", MB_OK );
+        return hr;
+    }
+
+	hr = g_pd3dDevice->CreateComputeShader( pCSBlob->GetBufferPointer(), pCSBlob->GetBufferSize(), NULL, &g_pCSWaves );
+    if( FAILED( hr ) )
+        return hr;
+	pCSBlob->Release();
+
+	// Create Texture
+	D3D11_TEXTURE2D_DESC textureDesc;
+	ZeroMemory(&textureDesc, sizeof(textureDesc));
+	textureDesc.Width = WIDTH;
+	textureDesc.Height = HEIGHT;
+	textureDesc.MipLevels = 1;
+	textureDesc.ArraySize = 1;
+	textureDesc.SampleDesc.Count = 1;
+	textureDesc.SampleDesc.Quality = 0;
+	textureDesc.Usage = D3D11_USAGE_DEFAULT;
+	textureDesc.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE;
+	textureDesc.Format = DXGI_FORMAT_R32G32B32A32_FLOAT;//DXGI_FORMAT_R8G8B8A8_UNORM
+	g_pd3dDevice->CreateTexture2D(&textureDesc, NULL, &g_pTexture);
+
+	g_pImmediateContext->UpdateSubresource(g_pTexture, 0, NULL, texData, 0, 0);
+
+	D3D11_UNORDERED_ACCESS_VIEW_DESC viewDescUAV;
+	ZeroMemory(&viewDescUAV, sizeof(viewDescUAV));
+	viewDescUAV.Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
+	viewDescUAV.ViewDimension = D3D11_UAV_DIMENSION_TEXTURE2D;
+	viewDescUAV.Texture2D.MipSlice = 0;
+	g_pd3dDevice->CreateUnorderedAccessView(g_pTexture, &viewDescUAV, &g_pTextureView);
+	    if( FAILED( hr ) )
+        return hr;
+
+	
+	D3D11_SHADER_RESOURCE_VIEW_DESC viewDescRes;
+	ZeroMemory(&viewDescRes, sizeof(viewDescRes));
+	viewDescRes.Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
+	viewDescRes.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+	viewDescRes.Texture2D.MipLevels = 1;
+	viewDescRes.Texture2D.MostDetailedMip = 0;
+	hr = g_pd3dDevice->CreateShaderResourceView(g_pTexture, &viewDescRes, &g_pTextureResourceView);
+
+	    if( FAILED( hr ) )
+        return hr;
+
+	    // Load the Texture
+/*
+		D3DX11_IMAGE_LOAD_INFO loadInfo;
+ZeroMemory( &loadInfo, sizeof(D3DX11_IMAGE_LOAD_INFO) );
+loadInfo.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+loadInfo.Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
+
+hr = D3DX11CreateShaderResourceViewFromFile( g_pd3dDevice, L"seafloor.dds", &loadInfo, NULL, &g_pTextureResourceView, NULL );
+    if( FAILED( hr ) )
+        return hr;
+
+*/
+
+
+    // Compile the vertex shader
+    ID3DBlob* pVSBlob = NULL;
+#ifdef USE_D3D11
+    hr = CompileShaderFromFile( L"waves.fx", "VS", "vs_5_0", &pVSBlob );
+#else
+	hr = CompileShaderFromFile( L"dcwavesview.fx", "VS", "vs_5_0", &pVSBlob );
+#endif
+    if( FAILED( hr ) )
+    {
+        MessageBox( NULL,
+                    L"The VIEWFX file cannot be compiled.  Please run this executable from the directory that contains the FX file.", L"Error", MB_OK );
         return hr;
     }
 
@@ -302,11 +429,16 @@ HRESULT InitDevice()
 
 	// Compile the pixel shader
 	ID3DBlob* pPSBlob = NULL;
-    hr = CompileShaderFromFile( L"waves.fx", "PS", "ps_5_0", &pPSBlob );
+#ifdef USE_D3D11
+	hr = CompileShaderFromFile( L"waves.fx", "PS", "ps_5_0", &pPSBlob );
+#else
+	hr = CompileShaderFromFile( L"dcwavesview.fx", "PS", "ps_5_0", &pPSBlob );
+#endif
+
     if( FAILED( hr ) )
     {
         MessageBox( NULL,
-                    L"The FX file cannot be compiled.  Please run this executable from the directory that contains the FX file.", L"Error", MB_OK );
+                    L"The VIEWPSFX file cannot be compiled.  Please run this executable from the directory that contains the FX file.", L"Error", MB_OK );
         return hr;
     }
 
@@ -350,6 +482,7 @@ HRESULT InitDevice()
     bd.Usage = D3D11_USAGE_DEFAULT;
     bd.ByteWidth = sizeof(CBWaveDesc);
     bd.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+	//bd.Usage = D3D11_USAGE_DYNAMIC;
     bd.CPUAccessFlags = 0;
     hr = g_pd3dDevice->CreateBuffer( &bd, NULL, &g_pCBWaveDesc );
     if( FAILED( hr ) )
@@ -359,17 +492,31 @@ HRESULT InitDevice()
     bd.Usage = D3D11_USAGE_DEFAULT;
     bd.ByteWidth = sizeof(CBWaveData);
     bd.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+	//bd.Usage = D3D11_USAGE_DYNAMIC;
     bd.CPUAccessFlags = 0;
     hr = g_pd3dDevice->CreateBuffer( &bd, NULL, &g_pCBWaveData );
     if( FAILED( hr ) )
         return hr;
     
+	// Create the sample state
+    D3D11_SAMPLER_DESC sampDesc;
+    ZeroMemory( &sampDesc, sizeof(sampDesc) );
+	sampDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_POINT;
+    sampDesc.AddressU = D3D11_TEXTURE_ADDRESS_WRAP;
+    sampDesc.AddressV = D3D11_TEXTURE_ADDRESS_WRAP;
+    sampDesc.AddressW = D3D11_TEXTURE_ADDRESS_WRAP;
+    sampDesc.ComparisonFunc = D3D11_COMPARISON_NEVER;
+    sampDesc.MinLOD = 0;
+    sampDesc.MaxLOD = D3D11_FLOAT32_MAX;
+    hr = g_pd3dDevice->CreateSamplerState( &sampDesc, &g_pSamplerLinear );
+    if( FAILED( hr ) )
+        return hr;
+
 		
 	
     g_cbWaveDesc.count = 0;
 	g_cbWaveDesc.dt = g_clock.get();
     g_pImmediateContext->UpdateSubresource( g_pCBWaveDesc, 0, NULL, &g_cbWaveDesc, 0, 0 );
-
 
 
     return S_OK;
@@ -444,12 +591,29 @@ void Render()
 
 	g_cbWaveDesc.dt = g_clock.get();
     g_pImmediateContext->UpdateSubresource( g_pCBWaveDesc, 0, NULL, &g_cbWaveDesc, 0, 0 );
+	
+	UINT counts = 0;
+	g_pImmediateContext->CSSetShader(g_pCSWaves, NULL, 0);
+	g_pImmediateContext->CSSetConstantBuffers(0, 1, &g_pCBWaveDesc);
+	g_pImmediateContext->CSSetConstantBuffers(1, 1, &g_pCBWaveData);
+	g_pImmediateContext->CSSetUnorderedAccessViews(0, 1, &g_pTextureView, 0);
+	g_pImmediateContext->Dispatch(WIDTH/16, HEIGHT/16, 1);
+
+	// Unbind resources for CS
+	ID3D11UnorderedAccessView* ppUAViewNULL[1] = { NULL };
+	g_pImmediateContext->CSSetUnorderedAccessViews( 0, 1, ppUAViewNULL, 0 );
+
 
     // Render a triangle
 	g_pImmediateContext->VSSetShader( g_pVertexShader, NULL, 0 );
 	g_pImmediateContext->PSSetShader( g_pPixelShader, NULL, 0 );
+#ifdef USE_D3D11
 	g_pImmediateContext->PSSetConstantBuffers( 0, 1, &g_pCBWaveDesc );
 	g_pImmediateContext->PSSetConstantBuffers( 1, 1, &g_pCBWaveData );
+#else
+	g_pImmediateContext->PSSetShaderResources(0, 1, &g_pTextureResourceView);
+	g_pImmediateContext->PSSetSamplers(0, 1, &g_pSamplerLinear);
+#endif
     g_pImmediateContext->Draw( 4, 0 );
 
     // Present the information rendered to the back buffer to the front buffer (the screen)

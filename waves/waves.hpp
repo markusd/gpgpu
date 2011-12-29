@@ -22,6 +22,8 @@
 // Start the DirectCompute version. You have to set the Linker to Windows, not Console
 #define USE_DIRECT_COMPUTE
 
+//#define USE_D3D11
+
 #define WIDTH 1024
 #define HEIGHT 1024
 
