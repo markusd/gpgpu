@@ -58,6 +58,7 @@ public slots:
 	void setIterations(int i) { m_iterations = i; };
 	void setRuns(int i) { m_runs = i; };
 	void doCluster();
+	void findK();
 	void doClear();
 	void doClearSeed();
 signals:

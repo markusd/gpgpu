@@ -47,7 +47,7 @@ ToolBox::ToolBox(QWidget *parent)
 	m_kBox->setRange(1, 100000);
 
 	m_iterationsBox = new QSpinBox();
-	m_iterationsBox->setSuffix(" iteratios");
+	m_iterationsBox->setSuffix(" iterations");
 	m_iterationsBox->setRange(1, 1000000);
 	
 	m_runBox = new QSpinBox();
@@ -55,6 +55,7 @@ ToolBox::ToolBox(QWidget *parent)
 	m_runBox->setRange(1, 1000000);
 
 	m_doClusterButton = new QPushButton("Cluster!");
+	m_findKButton = new QPushButton("Find k!");
 	m_clearButton = new QPushButton("Clear!");
 	m_clearSeedButton = new QPushButton("Clear Seed!");
 	m_clearSeedButton->hide();
@@ -64,6 +65,7 @@ ToolBox::ToolBox(QWidget *parent)
 	group_layout->addWidget(m_iterationsBox);
 	group_layout->addWidget(m_runBox);
 	group_layout->addWidget(m_doClusterButton);
+	group_layout->addWidget(m_findKButton);
 	group_layout->addWidget(m_clearButton);
 	group_layout->addWidget(m_clearSeedButton);
 	group_layout->addStretch(1);

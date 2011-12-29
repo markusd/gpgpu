@@ -1,6 +1,7 @@
 #include "kmeans.hpp"
 
 #ifndef USE_VISUALIZATION
+#ifndef USE_KMEANS_IMG
 
 #include <iostream>
 #include <fstream>
@@ -219,7 +220,7 @@ int main(int argc, char** argv)
 	//clNewCentroidBuf = cl::Buffer(clContext, CL_MEM_WRITE_ONLY | CL_MEM_USE_HOST_PTR, K * DIM * sizeof(float), centroids, &clError);
 	//if (clError != CL_SUCCESS) std::cout << "OpenCL Error: Could not create buffer" << std::endl;
 
-	clMappingBuf = cl::Buffer(clContext, CL_MEM_WRITE_ONLY | CL_MEM_USE_HOST_PTR, N * sizeof(int), mapping, &clError);
+	clMappingBuf = cl::Buffer(clContext, CL_MEM_READ_WRITE | CL_MEM_USE_HOST_PTR, N * sizeof(int), mapping, &clError);
 	if (clError != CL_SUCCESS) std::cout << "OpenCL Error: Could not create buffer" << std::endl;
 
 	clMeanBuf = cl::Buffer(clContext, CL_MEM_WRITE_ONLY | CL_MEM_USE_HOST_PTR, N * sizeof(int), mean, &clError);
@@ -248,7 +249,7 @@ int main(int argc, char** argv)
 
 	//clQueue.enqueueReadBuffer(clMeanBuf, CL_FALSE, 0, DIM * sizeof(float), mean, NULL, NULL);
 	clQueue.enqueueReadBuffer(clCentroidBuf, CL_TRUE, 0, K * DIM * sizeof(float), centroids, NULL, NULL);
-	//clQueue.enqueueReadBuffer(clMappingBuf, CL_TRUE, 0, N * sizeof(int), mapping, NULL, NULL);
+	clQueue.enqueueReadBuffer(clMappingBuf, CL_TRUE, 0, N * sizeof(int), mapping, NULL, NULL);
 
 	time = clock.get();
 	std::cout << time << std::endl;
@@ -312,5 +313,5 @@ int main(int argc, char** argv)
 }
 
 
-
+#endif /* USE_KMEANS_IMG */
 #endif /* USE_VISUALIZATION */

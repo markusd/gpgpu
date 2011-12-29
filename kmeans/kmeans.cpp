@@ -189,7 +189,7 @@ std::pair<std::vector<Vec2d>, double> kmeans(unsigned int iterations, unsigned i
 
 		// normalize cost
 		cost /= (double)input.size();
-		std::cout << "Iter " << iter << ": cost = " << cost << std::endl;
+		//std::cout << "Iter " << iter << ": cost = " << cost << std::endl;
 
 		// initialize new centroids
 		new_centroids.clear();
@@ -206,8 +206,9 @@ std::pair<std::vector<Vec2d>, double> kmeans(unsigned int iterations, unsigned i
 
 		// weight (normalize) the new centroids
 		for (int i = 0; i < k; ++i) {
-			if (new_centroids[i].second == 0)
-				std::cout << "Cluster is empty" << std::endl;
+			if (new_centroids[i].second == 0) {
+				//std::cout << "Cluster is empty" << std::endl;
+			}
 			double weight = new_centroids[i].second ? (double)new_centroids[i].second : 1.0;
 			centroids[i] = new_centroids[i].first * (1.0 / weight);
 		}
@@ -237,7 +238,7 @@ std::pair<std::vector<Vec2d>, double> kmeans(unsigned int iterations, unsigned i
 
 	// normalize cost
 	cost /= (double)input.size();
-	std::cout << "Final cost = " << cost << std::endl;
+	//std::cout << "Final cost = " << cost << std::endl;
 
 	return std::make_pair(centroids, cost);
 }

@@ -6,7 +6,10 @@
 #include <map>
 
 #define __CL_ENABLE_EXCEPTIONS
-//#define USE_VISUALIZATION
+
+
+#define USE_VISUALIZATION
+//#define USE_KMEANS_IMG
 
 using namespace m3d;
 

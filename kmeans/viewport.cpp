@@ -33,6 +33,7 @@
 #include <opencl/oclutil.hpp>
 
 #include <iostream>
+#include <fstream>
 
 
 using namespace m3d;
@@ -227,7 +228,7 @@ void Viewport::doCluster()
 
 	switch (m_seedingAlgorithm) {
 		case RANDOM:
-			
+
 			for (int i = 0; i < m_runs; ++i) {
 				m_seed = random_seed(m_k, m_input);
 
@@ -239,6 +240,9 @@ void Viewport::doCluster()
 			std::sort(results.begin(), results.end(), res_compare_func);
 			m_seed = results.front().first;
 			m_centroids = results.front().second.first;
+
+			std::cout << results.front().second.second << std::endl;
+
 			break;
 
 		case MANUAL:
@@ -265,6 +269,80 @@ void Viewport::doCluster()
 			m_centroids = result.first;
 			break;
 	}
+}
+
+void Viewport::findK()
+{
+	if (m_input.size() < m_k) {
+		QMessageBox msgBox;
+		msgBox.setText("Error: The input size is smaller than the number of clusters.");
+		msgBox.exec();
+		return;
+	}
+
+	if (m_seedingAlgorithm == MANUAL) {
+		QMessageBox msgBox;
+		msgBox.setText("Error: Cannot find k with manual seeding.");
+		msgBox.exec();
+		return;
+	}
+
+	// (seed, (centroid, cost))[]
+	std::vector<std::pair<std::vector<Vec2d>, std::pair<std::vector<Vec2d>, double> > > results;
+	std::pair<std::vector<Vec2d>, double> result;
+
+	// hide mean
+	m_mean = Vec2d(-100.0, -100.0);
+
+	float cost = 0.0f;
+	std::ofstream out_file("findk.csv");
+	out_file << "k,cost" << std::endl;
+
+	for (int j = 1; j <= m_k; ++j) {
+
+		switch (m_seedingAlgorithm) {
+			case RANDOM:
+				
+					for (int i = 0; i < m_runs; ++i) {
+						m_seed = random_seed(m_k, m_input);
+
+						// run kmeans
+						results.push_back(std::make_pair(m_seed, kmeans(m_iterations, j, m_input, m_seed)));
+						
+					}
+
+					std::sort(results.begin(), results.end(), res_compare_func);
+					m_seed = results.front().first;
+					m_centroids = results.front().second.first;
+
+					cost = results.front().second.second;
+
+				break;
+
+			case ASTRAHAN:
+				m_seed = astrahan(m_k, m_input);
+
+				// run kmeans
+				result = kmeans(m_iterations, m_k, m_input, m_seed);
+				m_centroids = result.first;
+				cost = result.second;
+				break;
+
+			case HARTIGAN_WONG:
+				std::pair<Vec2d, std::vector<Vec2d> > seed_result = hartigan_wong(m_k, m_input);
+				m_mean = seed_result.first;
+				m_seed = seed_result.second;
+
+				// run kmeans
+				result = kmeans(m_iterations, m_k, m_input, m_seed);
+				m_centroids = result.first;
+				cost = result.second;
+				break;
+		}
+
+		out_file << j << "," << cost << std::endl;
+	}
+	out_file.close();
 }
 
 void Viewport::setSeedingAlgorithm(SeedingAlgorithm s)

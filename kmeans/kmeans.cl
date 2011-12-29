@@ -55,9 +55,21 @@ __kernel void cluster_assignment(__global float* input, __global float* centroid
 	mapping[id] = cid;
 }
 
+
+/**
+ * Called DIM times in 1D.
+ */
 __kernel void cluster_reposition(__global float* input, __global int* mapping, __global float* new_centroids)
 {
+	//__local int mapping_cache[N];
 	int id = get_global_id(0);
+	int lid = get_local_id(0);
+
+//#pragma unroll
+//	for (int i = 0; i < N / 16; ++i)
+//		mapping_cache[i*16+lid] = mapping[i*16+lid];
+
+	//barrier(CLK_LOCAL_MEM_FENCE);
 
 	float comp[K];
 	float count[K];

@@ -33,6 +33,7 @@ public:
 	QSpinBox* m_iterationsBox;
 	QSpinBox* m_runBox;
 	QPushButton* m_doClusterButton;
+	QPushButton* m_findKButton;
 	QPushButton* m_clearSeedButton;
 	QPushButton* m_clearButton;
 };
