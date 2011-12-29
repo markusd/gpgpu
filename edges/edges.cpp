@@ -25,8 +25,8 @@ int main(int argc, char** argv)
 	//		std::endl;
 	//}
 
-	std::string in_file = "city.bmp"; //argv[1];
-	std::string out_file = "city.harris.bmp"; //argv[2];
+	std::string in_file = "bridge.bmp"; //argv[1];
+	std::string out_file = "bridge.h.bmp"; //argv[2];
 
 
 
@@ -38,63 +38,81 @@ int main(int argc, char** argv)
 		return 1;
 	}
 
-	// convert to grayscale image
+	cudaDeviceSynchronize();
+
+#ifdef USE_CUDA
+	util::Clock clock;
+	clock.reset();
+
+	uchar4* cuDevIn = NULL;
+	cudaMalloc((void **)&cuDevIn, w * h * sizeof(uchar4));
+	cudaMemcpy(cuDevIn, in_data, w * h * sizeof(uchar4), cudaMemcpyHostToDevice);
+
+	PIXEL* cuDevBuf1 = NULL;
+	cudaMalloc((void **)&cuDevBuf1, w * h * sizeof(PIXEL));
+
+	cuda_launch_grayscale(cuDevIn, w, h, cuDevBuf1);
+
+	PIXEL* cuDevBuf2 = NULL;
+	cudaMalloc((void **)&cuDevBuf2, w * h * sizeof(PIXEL));
+
+	cuda_launch_blur(cuDevBuf1, w, h, cuDevBuf2);
+
+	cuda_launch_sobel(cuDevBuf2, w, h, cuDevBuf1);
+
+	cuda_launch_localmaxima(cuDevBuf1, w, h, cuDevBuf2);
+
+	PIXEL* result_data = new PIXEL[w * h];
+
+	cudaMemcpy(result_data, cuDevBuf2, w * h * sizeof(PIXEL), cudaMemcpyDeviceToHost);
+
+	float time = clock.get();
+	std::cout << time << std::endl;
+
+	cudaFree(cuDevBuf1);
+	cudaFree(cuDevBuf2);
+	cudaFree(cuDevIn);
+
+#else /* USE_CUDA */
+
+		// convert to grayscale image
 	PIXEL* gray_scale = new PIXEL[w * h];
+
 	for (int x = 0; x < w; ++x) {
 		for (int y = 0; y < h; ++y) {
 #ifdef USE_FLOAT
-			gray_scale[x+y*w] = (0.3f * in_data[(x+y*h)*4+0] + 0.59f * in_data[(x+y*h)*4+1] + 0.11f * in_data[(x+y*h)*4+2]) / 255.0f;
+			gray_scale[x+y*w] = (0.3f * in_data[(x+y*w)*4+0] + 0.59f * in_data[(x+y*w)*4+1] + 0.11f * in_data[(x+y*w)*4+2]) / 255.0f;
 #else
-			gray_scale[x+y*w] = 0.3f * in_data[(x+y*h)*4+0] + 0.59f * in_data[(x+y*h)*4+1] + 0.11f * in_data[(x+y*h)*4+2];
+			gray_scale[x+y*w] = 0.333f * in_data[(x+y*w)*4+0] + 0.333f * in_data[(x+y*w)*4+1] + 0.333f * in_data[(x+y*w)*4+2];
 #endif
 		}
 	}
 
-	free(in_data);
+	
+	//free(in_data);
 
 	// edge data
-	PIXEL* edge_detect = new PIXEL[w * h];
+	PIXEL* result_data = new PIXEL[w * h];
 
 	util::Clock clock;
 	clock.reset();
+	float time = 0.0f;
+
 	
-#ifdef USE_CUDA
-	util::Clock up_clock;
-	up_clock.reset();
-
-	PIXEL* cuDevIn = NULL;
-	cudaMalloc((void **)&cuDevIn, w * h * sizeof(PIXEL));
-	cudaMemcpy(cuDevIn, gray_scale, w * h * sizeof(PIXEL), cudaMemcpyHostToDevice);
-
-	PIXEL* cuDevOut = NULL;
-	cudaMalloc((void **)&cuDevOut, w * h * sizeof(PIXEL));
-	cudaThreadSynchronize();
-	float up_time = up_clock.get();
-	std::cout << up_time << std::endl;
-	up_clock.reset();
-
-	cuda_launch_sobel(cuDevIn, w, h, cuDevOut);
-	cudaThreadSynchronize();
-	up_time = up_clock.get();
-	std::cout << up_time << std::endl;
-	up_clock.reset();
-
-	cudaMemcpy(edge_detect, cuDevOut, w * h * sizeof(PIXEL), cudaMemcpyDeviceToHost);
-	cudaThreadSynchronize();
-	up_time = up_clock.get();
-	std::cout << up_time << std::endl;
-#else
-
-
 	// find edges
 	for (int x = 0; x < w; ++x) {
 		for (int y = 0; y < h; ++y) {
-			//edge_detect[x+y*w] = sqrt(
-			//	SQR(gray_scale[x+y*w] - gray_scale[max(0, x-1)+y*w]) +
-			//	SQR(gray_scale[x+y*w] - gray_scale[x+max(0, y-1)*w]));
+			result_data[x+y*w] = sqrt((double)
+				SQR(gray_scale[x+y*w] - gray_scale[max(0, x-1)+y*w])  * 2.0 +
+				SQR(gray_scale[x+y*w] - gray_scale[x+max(0, y-1)*w])  * 2.0) * 1.2;
+
+			//result_data[x+y*w] =
+			//	abs(gray_scale[x+y*w] - gray_scale[x+max(0, y-1)*w]) * 2.0f;
 
 			
-			//edge_detect[x+y*w] = det(A) - k * spur(A)^2;
+			//result_data[x+y*w] = det(A) - k * spur(A)^2;
+
+			
 			float a1 = 
 				2.0f*gray_scale[min(w-1,x+1)+y*w] + gray_scale[min(w-1,x+1)+min(h-1,y+1)*w] + gray_scale[min(w-1,x+1)+max(0,y-1)*w] - 
 				2.0f*gray_scale[max(0,x-1)+y*w] - gray_scale[max(0,x-1)+min(h-1,y+1)*w] - gray_scale[max(0,x-1)+max(0,y-1)*w];
@@ -105,24 +123,26 @@ int main(int argc, char** argv)
 				2.0f*gray_scale[x+min(h-1,y+1)*w] + gray_scale[min(w-1,x+1)+min(h-1,y+1)*w] + gray_scale[max(0,x-1)+min(h-1,y+1)*w] - 
 				2.0f*gray_scale[x+max(0, y-1)*w] - gray_scale[min(w-1,x+1)+max(0, y-1)*w] - gray_scale[max(0,x-1)+max(0, y-1)*w];
 
-			edge_detect[x+y*w] = sqrt(a1*a1 + a2*a2);
+			//result_data[x+y*w] = sqrt(a1*a1 + a2*a2);
+			
 			
 			//float a3 = a1 * a2;
 			//a1 *= a1;
 			//a2 *= a2;
 
-			//edge_detect[x+y*w] = (a1 * a2 - a3 * a3) - k * SQR(a1 + a2);
+			//result_data[x+y*w] = (a1 * a2 - a3 * a3) - k * SQR(a1 + a2);
 
 			//float e1 = 0.5f * (a1 + a2) + 0.5f * sqrt(4.0f * a3 * a3 + SQR(a1 - a2));
 			//float e2 = 0.5f * (a1 + a2) - 0.5f * sqrt(4.0f * a3 * a3 + SQR(a1 - a2));
 
-			//edge_detect[x+y*w] = e1*e2 - k*SQR(e1+e2);
+			//result_data[x+y*w] = e1*e2 - k*SQR(e1+e2);
 			
 		}
 	}
+
 #endif
 
-	float time = clock.get();
+	time = clock.get();
 	std::cout << time << std::endl;
 
 
@@ -133,9 +153,12 @@ int main(int argc, char** argv)
 	for (int x = 0; x < w; ++x) {
 		for (int y = 0; y < h; ++y) {
 #ifdef USE_FLOAT
-			out_data[(x+y*w)*3+0] = out_data[(x+y*w)*3+1] = out_data[(x+y*w)*3+2] = (unsigned char)(edge_detect[x+y*w] * 255.0f);
+			out_data[(x+y*w)*3+0] = out_data[(x+y*w)*3+1] = out_data[(x+y*w)*3+2] = (unsigned char)(result_data[x+y*w] * 255.0f);
 #else
-			out_data[(x+y*w)*3+0] = out_data[(x+y*w)*3+1] = out_data[(x+y*w)*3+2] = edge_detect[x+y*w];
+			out_data[(x+y*w)*3+0] = out_data[(x+y*w)*3+1] = out_data[(x+y*w)*3+2] = result_data[x+y*w];
+			//out_data[(x+y*w)*3+0] = in_data[(x+y*w)*4+0];
+			//out_data[(x+y*w)*3+1] = in_data[(x+y*w)*4+2];
+			//out_data[(x+y*w)*3+2] = in_data[(x+y*w)*4+3];
 #endif
 		}
 	}

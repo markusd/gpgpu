@@ -2,6 +2,109 @@
 
 #define SQR(x) ((x)*(x))
 
+/**
+ * Gray scale kernel
+ */
+__global__ void cuda_grayscale(uchar4* in, int w, int h, PIXEL* out)
+{
+	int x = blockIdx.x*blockDim.x + threadIdx.x;
+	int y = blockIdx.y*blockDim.y + threadIdx.y;
+
+	uchar4 c = in[x+y*w];
+	out[x+y*w] = (0.3f * c.x + 0.59f * c.y + 0.11f * c.z);// / 255.0f;
+	//out[x+y*w] = 0.3f * in[x+y*w].x + 0.59f * in[x+y*w].y + 0.11f * in[x+y*w].z;
+}
+
+
+void cuda_launch_grayscale(uchar4* in, int w, int h, PIXEL* out)
+{
+	dim3 block(16, 16, 1);
+	dim3 grid(w / block.x, h / block.y, 1);
+	cuda_grayscale<<<grid, block>>>(in, w, h, out);
+}
+
+
+__global__ void cuda_blur(PIXEL* in, int w, int h, PIXEL* out)
+{
+	int x = blockIdx.x*blockDim.x + threadIdx.x;
+	int y = blockIdx.y*blockDim.y + threadIdx.y;
+
+	out[x+y*w] = (in[x+y*w] + in[x+1+y*w] + in[x+(y+1)*w] + in[x-1+y*w] + in[x+(y-1)*w]) * 0.2f;
+}
+
+
+void cuda_launch_blur(PIXEL* in, int w, int h, PIXEL* out)
+{
+	dim3 block(16, 16, 1);
+	dim3 grid(w / block.x, h / block.y, 1);
+	cuda_blur<<<grid, block>>>(in, w, h, out);
+}
+
+
+
+__global__ void cuda_localmaxima(PIXEL* in, int w, int h, PIXEL* out)
+{
+	int x = blockIdx.x*blockDim.x + threadIdx.x;
+	int y = blockIdx.y*blockDim.y + threadIdx.y;
+
+	int count = 0;
+	float c = in[x+y*w];
+
+	if (in[x+1+y*w] >= c) count++;
+	if (in[x+1+(y+1)*w] >= c) count++;
+	if (in[x+(y+1)*w] >= c) count++;
+	if (in[x-1+(y+1)*w] >= c) count++;
+	if (in[x-1+y*w] >= c) count++;
+	if (in[x-1+(y-1)*w] >= c) count++;
+	if (in[x+(y-1)*w] >= c) count++;
+	if (in[x+1+(y-1)*w] >= c) count++;
+	
+
+	out[x+y*w] = (count >= 1) ? 0 : (c > 10 ? 255 : 0);
+
+	out[x+y*w] = (c > 128) ? 255 : 0;
+}
+
+
+void cuda_launch_localmaxima(PIXEL* in, int w, int h, PIXEL* out)
+{
+	dim3 block(16, 16, 1);
+	dim3 grid(w / block.x, h / block.y, 1);
+	cuda_localmaxima<<<grid, block>>>(in, w, h, out);
+}
+
+
+__global__ void cuda_localmaxima2(PIXEL* in, int w, int h, PIXEL* out)
+{
+	int x = blockIdx.x*blockDim.x + threadIdx.x;
+	int y = blockIdx.y*blockDim.y + threadIdx.y;
+
+	int count = 0;
+	float c = in[x+y*w];
+
+	if (in[x+1+y*w] >= c) count++;
+	if (in[x+1+(y+1)*w] >= c) count++;
+	if (in[x+(y+1)*w] >= c) count++;
+	if (in[x-1+(y+1)*w] >= c) count++;
+	if (in[x-1+y*w] >= c) count++;
+	if (in[x-1+(y-1)*w] >= c) count++;
+	if (in[x+(y-1)*w] >= c) count++;
+	if (in[x+1+(y-1)*w] >= c) count++;
+	
+
+	out[x+y*w] = (count >= 1) ? 0 : (c > 10 ? 255 : 0);
+}
+
+
+void cuda_launch_localmaxima2(PIXEL* in, int w, int h, PIXEL* out)
+{
+	dim3 block(16, 16, 1);
+	dim3 grid(w / block.x, h / block.y, 1);
+	cuda_localmaxima2<<<grid, block>>>(in, w, h, out);
+}
+
+
+
 __global__ void cuda_edges(PIXEL* in, int w, int h, PIXEL* out)
 {
 	int x = blockIdx.x*blockDim.x + threadIdx.x;
@@ -17,7 +120,7 @@ void cuda_launch_edges(PIXEL* in, int w, int h, PIXEL* out)
 {
 	dim3 block(16, 16, 1);
 	dim3 grid(w / block.x, h / block.y, 1);
-	cuda_edges<<<grid, block>>>(in, w, h, out);
+	cuda_edges<<<dim3(), dim3()>>>(in, w, h, out);
 }
 
 
@@ -147,7 +250,19 @@ __global__ void cuda_sobel(PIXEL* in, int w, int h, PIXEL* out)
 		2.0f*in[x+max(0, y-1)*w] - in[min(w-1,x+1)+max(0, y-1)*w] - in[max(0,x-1)+max(0, y-1)*w];
 
 
-	out[x+y*w] = sqrt(a1*a1 + a2*a2);
+	float a3 = a1 * a2;
+	a1 *= a1;
+	a2 *= a2;
+
+	out[x+y*w] = abs((a1 * a2 - a3 * a3) - 0.04f * SQR(a1 + a2)) * 0.000001f;
+
+	//float e1 = 0.5f * (a1 + a2) + 0.5f * sqrt(4.0f * a3 * a3 + SQR(a1 - a2));
+	//float e2 = 0.5f * (a1 + a2) - 0.5f * sqrt(4.0f * a3 * a3 + SQR(a1 - a2));
+
+	//out[x+y*w] = e1*e2 - 0.04f*SQR(e1+e2);
+
+
+	//out[x+y*w] = sqrt(a1*a1 + a2*a2);
 }
 
 #endif /* USE_SHARED */
