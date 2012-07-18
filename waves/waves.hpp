@@ -17,15 +17,15 @@
 #define USE_CUDA
 
 // Use CUDA<->OpenGL interop for direct texture writes from kernels
-#define CUDA_GL_INTEROP
+//#define CUDA_GL_INTEROP
 
 // Start the DirectCompute version. You have to set the Linker to Windows, not Console
-#define USE_DIRECT_COMPUTE
+//#define USE_DIRECT_COMPUTE
 
 //#define USE_D3D11
 
-#define WIDTH 1024
-#define HEIGHT 1024
+#define WIDTH 32
+#define HEIGHT 32
 
 enum ComputationMode {
 	CPU,

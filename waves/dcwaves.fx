@@ -31,6 +31,7 @@ void CSWaves( uint3 Gid : SV_GroupID,
 
 	for (int i = 0; i < count; ++i) {
 		float2 dp = pos - float2(WavePos[i].xy);
+		//float dist = sqrt(dp.x*dp.x+dp.y*dp.y);
 		amp += waves * sin(6.2831f * (_dt - length(dp) * 5.0f));
 	}
 

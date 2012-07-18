@@ -20,6 +20,7 @@
 #include <util/inputadapters.hpp>
 #include <util/config.hpp>
 #include <util/tostring.hpp>
+#include <util/clock.hpp>
 
 #include <QtCore/QString>
 #include <QtGui/QWheelEvent>
@@ -66,6 +67,8 @@ cl::BufferRenderGL clRenderBuffer;
 
 GLuint glFBO;
 GLuint glRB;
+
+util::Clock g_clock_;
 
 #ifdef USE_CUDA
 
@@ -174,8 +177,7 @@ Viewport::Viewport(QWidget* parent) :
 
 
 
-
-
+	g_clock_.reset();
 	m_timer = new QTimer(this);
 	connect(m_timer, SIGNAL(timeout()), this, SLOT(updateGL()));
 }
@@ -316,13 +318,13 @@ void Viewport::initializeGL()
 	createKernel();
 	createShader();
 
+
+	//for (int i = 0; i < 20; i++)
+	//	mouseButton(util::LEFT, false, 0, i);
+
 	ogl::__Shader::unbind();
 
 	m_clock.reset();
-
-
-	mouseButton(util::LEFT, false, 0, HEIGHT/2);
-	mouseButton(util::LEFT, false, WIDTH-1, HEIGHT/2);
 }
 
 void Viewport::resizeGL(int width, int height)
@@ -399,6 +401,8 @@ void Viewport::createTextureOpenCL(float dt)
 	try {
 		cl_int error = CL_SUCCESS;
 
+		float time = g_clock_.get();
+
 #ifdef GL_INTEROP
 #ifdef GL_FBO
 		clKernel.setArgs(clRenderBuffer(), WIDTH, dt);
@@ -424,7 +428,10 @@ void Viewport::createTextureOpenCL(float dt)
 		clQueue.enqueueReadBuffer(clOut, false, 0, WIDTH*HEIGHT*4*sizeof(float), m_clTextureData, NULL, NULL);
 #endif
 
-		clQueue.finish();
+		//clQueue.finish();
+
+		float time2 = g_clock_.get();
+		//std::cout << time2-time << "\n";
 
 		glEnable(GL_TEXTURE_2D);
 		m_texture->bind();
@@ -533,12 +540,14 @@ void Viewport::createTextureCPU(float dt)
 			//std::cout << (int)c->z << std::endl << std::endl;
 		}
 	}
+	if (m_waves.size() > 0) {
 #ifndef CPU_FLOAT
 	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, WIDTH, HEIGHT, GL_RGB, GL_UNSIGNED_BYTE, m_textureData);
 #else
 	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, WIDTH, HEIGHT, GL_RGB, GL_FLOAT, m_textureData);
 #endif
 	//glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, WIDTH, HEIGHT, 0, GL_RGB, GL_FLOAT, m_textureData);
+	}
 }
 
 #ifdef USE_CUDA
@@ -724,7 +733,7 @@ void Viewport::createKernel()
 	try {
 		cl::Program::Sources source(1, std::make_pair(code.c_str(), code.size()));
 		clProgram = cl::Program(clContext, source);
-		clProgram.build(clDevices, "-cl-fast-relaxed-math");
+		clProgram.build(clDevices, "-cl-fast-relaxed-math -cl-unsafe-math-optimizations -cl-mad-enable");
 
 		std::string info("");
 		clProgram.getBuildInfo(clDevices[0], CL_PROGRAM_BUILD_LOG, &info);

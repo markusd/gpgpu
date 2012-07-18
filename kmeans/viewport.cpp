@@ -140,14 +140,7 @@ void Viewport::paintGL()
 	}
 	glEnd();
 
-	// centroids
-	glColor3f(1.0f, 0.0f, 0.0f);
-	glPointSize(6.0f);
-	glBegin(GL_POINTS);
-	for (int i = 0; i < m_centroids.size(); ++i) {
-		glVertex2d(m_centroids[i].x * WIDTH, m_centroids[i].y * HEIGHT);
-	}
-	glEnd();
+
 
 	// seed
 	glColor3f(0.0f, 0.0f, 1.0f);
@@ -155,6 +148,16 @@ void Viewport::paintGL()
 	glBegin(GL_POINTS);
 	for (int i = 0; i < m_seed.size(); ++i) {
 		glVertex2d(m_seed[i].x * WIDTH, m_seed[i].y * HEIGHT);
+	}
+	glEnd();
+
+
+		// centroids
+	glColor3f(1.0f, 0.0f, 0.0f);
+	glPointSize(6.0f);
+	glBegin(GL_POINTS);
+	for (int i = 0; i < m_centroids.size(); ++i) {
+		glVertex2d(m_centroids[i].x * WIDTH, m_centroids[i].y * HEIGHT);
 	}
 	glEnd();
 

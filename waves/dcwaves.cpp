@@ -12,6 +12,9 @@
 #include <io.h>
 #include <fcntl.h>
 
+#include <iostream>
+#include <fstream>
+
 using namespace m3d;
 
 #define IDI_TUTORIAL1           107
@@ -66,6 +69,8 @@ util::Clock g_clock;
 CBWaveDesc g_cbWaveDesc;
 CBWaveData g_cbWaveData;
 float* texData = NULL;
+
+std::ofstream g_logfile;
 
 
 //--------------------------------------------------------------------------------------
@@ -142,6 +147,9 @@ int WINAPI wWinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdL
         return 0;
     }
 
+	g_logfile.open("log.csv");
+	g_logfile << "fps\n";
+	
 	g_clock.reset();
 
     // Main message loop
@@ -159,6 +167,7 @@ int WINAPI wWinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdL
         }
     }
 
+	g_logfile.close();
     CleanupDevice();
 
     return ( int )msg.wParam;
@@ -589,6 +598,8 @@ void Render()
     float ClearColor[4] = { 0.0f, 0.125f, 0.3f, 1.0f }; // red,green,blue,alpha
     g_pImmediateContext->ClearRenderTargetView( g_pRenderTargetView, ClearColor );
 
+	float time = g_clock.get();
+
 	g_cbWaveDesc.dt = g_clock.get();
     g_pImmediateContext->UpdateSubresource( g_pCBWaveDesc, 0, NULL, &g_cbWaveDesc, 0, 0 );
 	
@@ -598,11 +609,14 @@ void Render()
 	g_pImmediateContext->CSSetConstantBuffers(1, 1, &g_pCBWaveData);
 	g_pImmediateContext->CSSetUnorderedAccessViews(0, 1, &g_pTextureView, 0);
 	g_pImmediateContext->Dispatch(WIDTH/16, HEIGHT/16, 1);
+	g_pImmediateContext->Flush();
 
 	// Unbind resources for CS
 	ID3D11UnorderedAccessView* ppUAViewNULL[1] = { NULL };
 	g_pImmediateContext->CSSetUnorderedAccessViews( 0, 1, ppUAViewNULL, 0 );
 
+	float time2 = g_clock.get();
+	std::cout << time2-time << "\n";
 
     // Render a triangle
 	g_pImmediateContext->VSSetShader( g_pVertexShader, NULL, 0 );
@@ -623,6 +637,7 @@ void Render()
 	frames++;
 	if (dt - fps_time >= 1.0f) {
 		LPCSTR text = util::toString(frames);
+		g_logfile << frames << "\n";
 		//std::cout << dt << ", " << fps_time << ", " << frames << std::endl;
 		
 		SetWindowTextA(g_hWnd, text);

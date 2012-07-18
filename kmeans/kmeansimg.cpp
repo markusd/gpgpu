@@ -61,7 +61,8 @@ void cluster_assignment(Vecf* input, Vecf* centroids, int* mapping)
 
 		// for each centroid
 		for (int j = 0; j < K; j++) {
-			float dist = (input[i] - centroids[j]).lenlen();
+			//float dist = (input[i] - centroids[j]).lenlen();
+			float dist = input[i].distsqr(centroids[j]);
 
 			if (dist < min_dist) {
 				mapping[i] = j;
@@ -125,7 +126,7 @@ int main(int argc, char** argv)
 	Vecf* input = (Vecf *)in_dataf;
 	int* mapping = new int[N];
 
-	for (int num_clusters = 1; num_clusters <= 25; ++num_clusters) { 
+	for (int num_clusters = 1; num_clusters <= 256; num_clusters *= 2) { 
 
 		K = num_clusters;
 

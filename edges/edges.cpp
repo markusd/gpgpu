@@ -25,8 +25,8 @@ int main(int argc, char** argv)
 	//		std::endl;
 	//}
 
-	std::string in_file = "bridge.bmp"; //argv[1];
-	std::string out_file = "bridge.h.bmp"; //argv[2];
+	std::string in_file = "pepper.bmp"; //argv[1];
+	std::string out_file = "pepper.test.bmp"; //argv[2];
 
 
 
@@ -38,7 +38,7 @@ int main(int argc, char** argv)
 		return 1;
 	}
 
-	cudaDeviceSynchronize();
+	//cudaDeviceSynchronize();
 
 #ifdef USE_CUDA
 	util::Clock clock;
@@ -61,6 +61,7 @@ int main(int argc, char** argv)
 	cuda_launch_sobel(cuDevBuf2, w, h, cuDevBuf1);
 
 	cuda_launch_localmaxima(cuDevBuf1, w, h, cuDevBuf2);
+
 
 	PIXEL* result_data = new PIXEL[w * h];
 

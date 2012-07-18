@@ -16,6 +16,14 @@ bool createContext(cl_device_type type, cl_context_properties glContext, cl_cont
 			std::cout << "OpenCL: No platform found" << std::endl;
 			return false;
 		}
+
+		for (int i = 0; i < platforms.size(); ++i) {
+			platforms[i].getInfo(CL_PLATFORM_NAME, &info);
+			std::cout << "Platform found " << info << std::endl;
+		}
+
+		std::cout << "Choose" << std::endl;
+
 		int use = 0;
 		for (int i = 0; i < platforms.size(); ++i) {
 			platforms[i].getInfo(CL_PLATFORM_NAME, &info);
@@ -23,7 +31,6 @@ bool createContext(cl_device_type type, cl_context_properties glContext, cl_cont
 			platform = platforms[i];
 			std::cin >> use;
 			std::cin.get();
-			std::cout << use << std::endl;
 			if (use) break;
 		}
 		if (platform() == NULL) platform = platforms[0];
@@ -36,13 +43,34 @@ bool createContext(cl_device_type type, cl_context_properties glContext, cl_cont
 			return false;
 		}
 
-		while (devices.size() > 1)
-			devices.pop_back();
+		//while (devices.size() > 1)
+		//	devices.pop_back();
+
+		
 
 		for (std::vector<cl::Device>::iterator itr = devices.begin(); itr != devices.end(); ++itr) {
 			itr->getInfo(CL_DEVICE_NAME, &info);
 			std::cout << "Device Name " << info << std::endl;
 		}
+
+		std::cout << "Choose" << std::endl;
+
+
+		cl::Device device = devices[0];
+		for (std::vector<cl::Device>::iterator itr = devices.begin(); itr != devices.end(); ++itr) {
+			itr->getInfo(CL_DEVICE_NAME, &info);
+			std::cout << "Device Name " << info << std::endl;
+
+			std::cin >> use;
+			std::cin.get();
+			if (use) {
+				device = *itr;
+			}
+		}
+
+		devices.clear();
+		devices.push_back(device);
+
 
 		if (glContext && hDC) {
 			cl_context_properties props[] = {
@@ -59,6 +87,73 @@ bool createContext(cl_device_type type, cl_context_properties glContext, cl_cont
 		}
 
 		queue = cl::CommandQueue(context, devices[0], 0, NULL);
+	} catch (cl::Error clError) {
+		std::cerr 
+			<< "OpenCL Error: "
+			<< clError.what()
+			<< "("
+			<< clError.err()
+			<< ")"
+			<< std::endl;
+		return false;
+	}
+	return true;
+}
+
+
+bool createContextEx(cl_device_type type,
+					 cl::Platform& platform,
+					 std::vector<cl::Device>& devices,
+					 cl::Context& context,
+					 std::vector<cl::CommandQueue>& queues)
+{
+	cl_int clError = CL_SUCCESS;
+	std::string info("");
+	platform = NULL;
+	try {
+		std::vector<cl::Platform> platforms;
+		cl::Platform::get(&platforms);
+		if (platforms.size() == 0) {
+			std::cout << "OpenCL: No platform found" << std::endl;
+			return false;
+		}
+
+		for (int i = 0; i < platforms.size(); ++i) {
+			platforms[i].getInfo(CL_PLATFORM_NAME, &info);
+			std::cout << "Platform found " << info << std::endl;
+		}
+
+		std::cout << "Choose" << std::endl;
+
+		int use = 0;
+		for (int i = 0; i < platforms.size(); ++i) {
+			platforms[i].getInfo(CL_PLATFORM_NAME, &info);
+			std::cout << "Platform found " << info << ". Press '1' to use or '0' to see the next. " << std::endl;
+			platform = platforms[i];
+			std::cin >> use;
+			std::cin.get();
+			if (use) break;
+		}
+		if (platform() == NULL) platform = platforms[0];
+		platform.getInfo(CL_PLATFORM_NAME, &info);
+		std::cout << "Platform name " << info << std::endl;
+
+		platform.getDevices(CL_DEVICE_TYPE_ALL, &devices);
+		if (devices.size() == 0) {
+			std::cout << "OpenCL: No device found" << std::endl;
+			return false;
+		}
+
+		cl_context_properties props[] = { CL_CONTEXT_PLATFORM, (cl_context_properties)platform(), 0 };
+		context = cl::Context(CL_DEVICE_TYPE_ALL, props);
+
+		for (std::vector<cl::Device>::iterator itr = devices.begin(); itr != devices.end(); ++itr) {
+			itr->getInfo(CL_DEVICE_NAME, &info);
+			std::cout << "Device Name " << info << std::endl;
+
+			queues.push_back(cl::CommandQueue(context, *itr, 0, NULL));
+		}
+
 	} catch (cl::Error clError) {
 		std::cerr 
 			<< "OpenCL Error: "

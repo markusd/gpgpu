@@ -16,6 +16,10 @@ public:
 
 	T len() const;
 	T lenlen() const;
+	T dist(const Vec<N,T>& b) const;
+	T distsqr(const Vec<N,T>& b) const;
+	T distcos(const Vec<N,T>& b) const;
+	T disttan(const Vec<N,T>& b) const;
 
 	Vec<N,T> operator+(const Vec<N,T>& b) const;
 	Vec<N,T> operator-(const Vec<N,T>& b) const;
@@ -59,6 +63,60 @@ T Vec<N,T>::lenlen() const
 	for (int i = 0; i < N; ++i)
 		result += v[i] * v[i];
 	return result;
+}
+
+template<int N, typename T>
+inline
+T Vec<N,T>::dist(const Vec<N,T>& b) const
+{
+	T result = 0.0f;
+	for (int i = 0; i < N; ++i)
+		result += (v[i] - b[i]) * (v[i] - b[i]);
+	return sqrt(result);
+}
+
+template<int N, typename T>
+inline
+T Vec<N,T>::distsqr(const Vec<N,T>& b) const
+{
+	T result = 0.0f;
+	for (int i = 0; i < N; ++i)
+		result += (v[i] - b[i]) * (v[i] - b[i]);
+	return result;
+}
+
+template<int N, typename T>
+inline
+T Vec<N,T>::distcos(const Vec<N,T>& b) const
+{
+	T result = 0.0f;
+	T lena = 0.0f;
+	T lenb = 0.0f;
+
+	for (int i = 0; i < DIM; ++i) {
+		result += v[i] * b[i];
+		lena += v[i] * v[i];
+		lenb += b[i] * b[i];
+	}
+
+	return 1.0f - result / (sqrt(lena) * sqrt(lenb));
+}
+
+template<int N, typename T>
+inline
+T Vec<N,T>::disttan(const Vec<N,T>& b) const
+{
+	T result = 0.0f;
+	T lena = 0.0f;
+	T lenb = 0.0f;
+
+	for (int i = 0; i < DIM; ++i) {
+		result += v[i] * b[i];
+		lena += v[i] * v[i];
+		lenb += b[i] * b[i];
+	}
+
+	return 1.0f - result / (lena + lenb - result);
 }
 
 
