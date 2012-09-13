@@ -29,8 +29,6 @@
 
 #include <string.h>
 
-#include <opengl/stb_image.hpp>
-
 #ifdef _WIN32
 	#include <windows.h>
 	#undef max
@@ -39,27 +37,18 @@
 	#include <sys/time.h>
 #endif
 
-#include <png.h>
-#include <jpeglib.h>
-
-int DIM = 4;
-int N = 1024*1024;
-int K = 256;
+int DIM = 1024;
+int N = 2048;
+int K = 16;
 int ITERATIONS = 20;
+int RUNS = 100;
 
-int AM_LWS = 256; //8
-int RP_LWS = 4; //32
-int CT_LWS = 256; //32
+int AM_LWS = 8;
+int RP_LWS = 64;
+int CT_LWS = 8;
 
 int USE_ALL_DEVICES = 1;
 int device_count = 1;
-
-std::string input_folder = "images";
-std::string output_folder = "output";
-
-std::string uploader = "";
-
-std::vector<std::string> image_list;
 
 #ifdef USE_OPENCL
 cl::Platform clPlatform;
@@ -77,8 +66,14 @@ std::vector<cl::Buffer> clCentroidBuf;
 std::vector<cl::Buffer> clMappingBuf;
 std::vector<cl::Buffer> clReductionBuf;
 std::vector<cl::Buffer> clConvergedBuf;
+
+boost::thread_group reduction_group;
 #endif
 
+std::vector<float*> input_list;
+std::vector<float*> centroids_list;
+std::vector<int*> mapping_list;
+std::vector<float> cost_list;
 
 boost::mt19937 rng;
 boost::uniform_real<float> u;
@@ -97,23 +92,6 @@ uint64_t getTimeMs(void)
 float gen_random_float()
 {
     return (*gen)();
-}
-
-bool get_image_files(std::string folder)
-{
-	using namespace boost::filesystem;
-
-	path p (folder);
-
-	if (is_directory(p)) {
-		if(!is_empty(p)) {
-			directory_iterator end_itr;
-			for (directory_iterator itr(p); itr != end_itr; ++itr) {
-				image_list.push_back(folder + "/" + itr->leaf());
-			}
-		}
-	}
-	return image_list.size() > 0;
 }
 
 #ifdef USE_OPENCL
@@ -234,7 +212,10 @@ void cluster_assignment(float* input, float* centroids, int* mapping)
 
 void cluster_reposition(float* input, float* centroids, int* mapping)
 {
+//	bool converged = true;
 	float* count = new float[K];
+//	float* old_centroids = new float[K*DIM];
+//	memcpy(old_centroids, centroids, K*DIM*sizeof(float));
 
 	for (int i = 0; i < K; ++i) {
 		count[i] = 0.0f;
@@ -249,264 +230,52 @@ void cluster_reposition(float* input, float* centroids, int* mapping)
 		}
 	}
 
-	for (int i = 0; i < K; ++i)
-		for (int j = 0; j < DIM; ++j)
+	for (int i = 0; i < K; ++i) {
+		//float dist = 0.0f;
+		for (int j = 0; j < DIM; ++j) {
 			centroids[i*DIM+j] /= count[i];
+			//dist += (centroids[i*DIM+j] - old_centroids[i*DIM+j]) * (centroids[i*DIM+j] - old_centroids[i*DIM+j]);
+		}
+		//if (dist > 0.01f)
+		//	converged = false;
+	}
 
 	delete[] count;
+	//delete[] old_centroids;
+
+	//return converged;
+}
+
+float cluster_compute_cost(float* input, float* centroids, int* mapping)
+{
+	float cost = 0.0f;
+	for (int i = 0; i < N; ++i) {
+		float dist = 0.0f;
+		for (int l = 0; l < DIM; ++l) {
+			dist += (input[i*DIM+l] - centroids[mapping[i]*DIM+l]) * (input[i*DIM+l] - centroids[mapping[i]*DIM+l]);
+		}
+		cost += dist;
+	}
+	return cost / (float)N;
 }
 #endif
 
-void save_image(const std::string& file, const int w, const int h, float* centroids, int* mapping)
+void reduce_cost(int pass, float* cost)
 {
-	boost::filesystem::path path(file);
-	std::string out_name = output_folder + "/" + boost::filesystem::basename(file);
-
-	// copy to output buffer
-	unsigned char* out_data = new unsigned char[w * h * 3];
-	unsigned int out_size = w * h * 3;
-
-	for (int y = 0; y < h; ++y) {
-		for (int x = 0; x < w; ++x) {
-			out_data[(x+y*h)*3+0] = (unsigned char)(centroids[mapping[x+y*h]*DIM+0] * 255.0f);
-			out_data[(x+y*h)*3+1] = (unsigned char)(centroids[mapping[x+y*h]*DIM+1] * 255.0f);
-			out_data[(x+y*h)*3+2] = (unsigned char)(centroids[mapping[x+y*h]*DIM+2] * 255.0f);
-		}
-	}
-
-	struct jpeg_compress_struct cinfo;
-	struct jpeg_error_mgr jerr;
-
-	FILE * outfile;
-	JSAMPROW* row_pointer = new JSAMPROW[h];
-	int row_stride;
-
-	cinfo.err = jpeg_std_error(&jerr);
-	jpeg_create_compress(&cinfo);
-
-	if ((outfile = fopen(out_name.c_str(), "wb")) == NULL) {
-		return;
-	}
-
-	jpeg_stdio_dest(&cinfo, outfile);
-
-	cinfo.image_width = w;
-	cinfo.image_height = h;
-	cinfo.input_components = 3;
-	cinfo.in_color_space = JCS_RGB;
-
-	jpeg_set_defaults(&cinfo);
-	jpeg_set_quality(&cinfo, 80, TRUE);
-	jpeg_start_compress(&cinfo, TRUE);
-
-	row_stride = w * 3;
-	for (int k = 0; k < h; k++)
-		row_pointer[k] = (JSAMPROW) (out_data + k*w*3);
-
-	jpeg_write_scanlines(&cinfo, row_pointer, h);
-
-
-	jpeg_finish_compress(&cinfo);
-	fclose(outfile);
-	jpeg_destroy_compress(&cinfo);
-	delete[] row_pointer;
-
-	/*
-
-	FILE *fp = NULL;
-	png_structp png_ptr;
-	png_infop info_ptr;
-	png_colorp palette;
-	png_bytep trans;
-
-	fp = fopen(out_name.c_str(), "wb");
-	if (fp == NULL)
-		return;
-
-   png_ptr = png_create_write_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
-
-	if (png_ptr == NULL) {
-		fclose(fp);
-		return;
-	}
-
-	info_ptr = png_create_info_struct(png_ptr);
-	if (info_ptr == NULL) {
-		fclose(fp);
-		png_destroy_write_struct(&png_ptr,  NULL);
-		return;
-	}
-
-	if (setjmp(png_jmpbuf(png_ptr))) {
-		fclose(fp);
-		png_destroy_write_struct(&png_ptr, &info_ptr);
-		return;
-	}
-
-	png_init_io(png_ptr, fp);
-
-	png_set_IHDR(png_ptr, info_ptr, w, h, 8, PNG_COLOR_TYPE_PALETTE,
-		PNG_INTERLACE_NONE, PNG_COMPRESSION_TYPE_BASE, PNG_FILTER_TYPE_BASE);
-
-	std::cout << "setihdr" << std::endl;
-
-	palette = (png_colorp)png_malloc(png_ptr, K * png_sizeof(png_color));
-
-	std::cout << "png_malloc" << std::endl;
-
-	for (int i = 0; i < K; ++i) {
-		//palette[i].red = in_dataf[i*4]*255;
-		//palette[i].green = in_dataf[i*4+1]*255;
-		//palette[i].blue = in_dataf[i*4+2]*255;
-		palette[i].red = (unsigned char)(centroids[i*DIM+0]*255.0f);
-		palette[i].green = (unsigned char)(centroids[i*DIM+1]*255.0f);
-		palette[i].blue = (unsigned char)(centroids[i*DIM+2]*255.0f);
-	}
-
-	std::cout << "gen palette" << std::endl;
-	png_set_PLTE(png_ptr, info_ptr, palette, K);
-
-	std::cout << "set palette" << std::endl;
-
-	trans = (png_bytep)png_malloc(png_ptr, K * png_sizeof(png_byte));
-	for (int i = 0; i < K; ++i)
-		trans[i] = (unsigned char)(centroids[i*DIM+3]*255.0f);
-
-	std::cout << "gen trans" << std::endl;
-
-	png_set_tRNS(png_ptr, info_ptr, trans, K, NULL);
-
-	std::cout << "set trans" << std::endl;
-
-	png_write_info(png_ptr, info_ptr);
-
-	std::cout << "write info" << std::endl;
-
-	int number_passes = 1;
-
-	png_uint_32 k;
-	png_byte* image = new png_byte[h*w*1];
-
-	std::cout << "alloc image" << std::endl;
-
-	for (int y = 0; y < h; ++y) {
-		for (int x = 0; x < w; ++x) {
-			image[y*w+x] = (unsigned char)mapping[x+y*w];
-		}
-	}
-
-	std::cout << "gen image" << std::endl;
-
-	png_bytep* row_pointers = new png_bytep[h];
-
-	for (k = 0; k < h; k++)
-		row_pointers[k] = (png_bytep) (image + k*w*1);
-
-	std::cout << "gen pointer" << std::endl;
-
-	png_write_image(png_ptr, row_pointers);
-
-	std::cout << "write image" << std::endl;
-
-	png_write_end(png_ptr, info_ptr);
-
-	png_free(png_ptr, palette);
-	palette = NULL;
-
-	png_free(png_ptr, trans);
-	trans = NULL;
-
-	png_destroy_write_struct(&png_ptr, &info_ptr);
-
-	fclose(fp);
-
-	delete[] row_pointers;
-	delete[] image;
-
-*/
-	/*
-
-	// copy to output buffer
-	unsigned char* out_data = new unsigned char[w * h * 3];
-	unsigned int out_size = w * h * 3;
-
-	for (int x = 0; x < w; ++x) {
-		for (int y = 0; y < h; ++y) {
-			out_data[(x+y*w)*3+0] = centroids[mapping[x+y*w]*DIM+2] * 255.0f;
-			out_data[(x+y*w)*3+1] = centroids[mapping[x+y*w]*DIM+1] * 255.0f;
-			out_data[(x+y*w)*3+2] = centroids[mapping[x+y*w]*DIM+0] * 255.0f;
-		}
-	}
-
-
-	FILE *out_fdesc = fopen(out_name.c_str(), "wb");
-	if (out_fdesc == NULL) {
-		std::cerr << "Error: Could not create output file" << std::endl;
-	}
-
-	BITMAPFILEHEADER fileHeader;
-	BITMAPINFOHEADER infoHeader;
-
-	fileHeader.bfType	  = 0x4d42;
-	fileHeader.bfSize	  = 0;
-	fileHeader.bfReserved1 = 0;
-	fileHeader.bfReserved2 = 0;
-	fileHeader.bfOffBits   = sizeof(BITMAPFILEHEADER) + sizeof(BITMAPINFOHEADER);
-
-	infoHeader.biSize		  = sizeof(infoHeader);
-	infoHeader.biWidth		 = w;
-	infoHeader.biHeight		= h;
-	infoHeader.biPlanes		= 1;
-	infoHeader.biBitCount	  = 24;
-	infoHeader.biCompression   = BI_RGB;
-	infoHeader.biSizeImage	 = 0;
-	infoHeader.biXPelsPerMeter = 0;
-	infoHeader.biYPelsPerMeter = 0;
-	infoHeader.biClrUsed	   = 0;
-	infoHeader.biClrImportant  = 0;
-
-	fwrite((char*)&fileHeader, sizeof(fileHeader), 1, out_fdesc);
-	fwrite((char*)&infoHeader, sizeof(infoHeader), 1, out_fdesc);
-
-	// first row is saved last in a bitmap
-	for (int y = 0; y < h; ++y)
-		fwrite(&out_data[(h-1-y)*w*3], sizeof(unsigned char), w * 3, out_fdesc);
-	fclose(out_fdesc);
-*/
-
-	delete[] centroids;
-	delete[] mapping;
-
-	if (uploader.size() > 0) {
-		std::string command = uploader + " " + out_name;
-		std::cout << "Uploading: " << command << std::endl;
-		system(command.c_str());
-	}
+	float sum = 0.0f;
+	for (int i = 0; i < N; ++i)
+		sum += cost[i];
+	cost_list[pass] = sum / (float)N;
+	delete[] cost;
 }
 
-void prefetch_image(const std::string& file, int* w, int* h, float** input, float** centroids, int** mapping, bool* success, bool* fetched)
-{
-	int c = 0;
-	*input = stbi_loadf(file.c_str(), w, h, &c, STBI_rgb_alpha);
-	if (!(*input)) {
-		std::cerr << "Could not load " << file << std::endl;
-		*success = false;
-		if (fetched)
-			*fetched = true;
-		return;
-	}
-
-	*centroids = random_cluster_init(*input);
-	*mapping = new int[N];
-	*success = true;
-	if (fetched)
-		*fetched = true;
-}
 
 void exec(int id, bool threaded)
 {
 	if (threaded)
 		std::cout << "thread:" << boost::this_thread::get_id() << ": " << id << std::endl;
+
+	float* input = input_list[id];
 
 #ifdef USE_OPENCL
 	const cl::CommandQueue& queue = clQueues[id];
@@ -522,68 +291,21 @@ void exec(int id, bool threaded)
 	//const cl::Buffer& convergedBuf = clConvergedBuf[id];
 	const cl::Buffer& reductionBuf = clReductionBuf[id];
 
-	int _w = 0, _h = 0;
-	bool _success = false;
-	float* _input = NULL;
-	float* _centroids = NULL;
-	int* _mapping = NULL;
-	bool _fetched = false;
+	queue.enqueueWriteBuffer(inputBuf, CL_FALSE, 0, N * DIM * sizeof(float), (void*)input, NULL, NULL);
 #endif
 
-	int iteration = 0;
+	for (int pass = id; pass < RUNS; pass += device_count) {
 
-	for (int pass = id; pass < image_list.size(); pass += device_count) {
-		std::string& file = image_list[pass];
-
-		int w = 0, h = 0, c = 0;
-		float* input = NULL;
-		float* centroids = NULL;
-		int* mapping = NULL;
-		bool success = false;
-
-#ifdef USE_OPENCL
-		if (pass == id) {
-			prefetch_image(file, &w, &h, &input, &centroids, &mapping, &success, NULL);
-			if (!success) {
-				_fetched = false;
-				boost::thread worker(boost::bind(prefetch_image, image_list[pass + device_count], &_w, &_h, &_input, &_centroids, &_mapping, &_success, &_fetched));
-				continue;
-			}
-		} else {
-			while (!_fetched)
-				;
-			//prefetch_image(file, &w, &h, &input, &centroids, &mapping, &success, NULL);
-			if (!_success) {
-				_fetched = false;
-				boost::thread worker(boost::bind(prefetch_image, image_list[pass + device_count], &_w, &_h, &_input, &_centroids, &_mapping, &_success, &_fetched));
-				continue;
-			}
-
-			w = _w;
-			h = _h;
-			input = _input;
-			centroids = _centroids;
-			mapping = _mapping;
-		}
-
-		if (pass + device_count < image_list.size()) {
-			_fetched = false;
-			boost::thread worker(boost::bind(prefetch_image, image_list[pass + device_count], &_w, &_h, &_input, &_centroids, &_mapping, &_success, &_fetched));
-			//prefetch_image(image_list[pass + device_count], &_w, &_h, &_input, &_centroids, &_mapping, &_success, &_fetched);
-		}
-#else
-		prefetch_image(file, &w, &h, &input, &centroids, &mapping, &success, NULL);
-		if (!success)
-			continue;
-#endif
-
+		float* reduction = new float[N];
+		float* centroids = random_cluster_init(input);
+		int* mapping = new int[N];
+		centroids_list[pass] = centroids;
+		mapping_list[pass] = mapping;
 
 		util::Clock clock;
 		clock.reset();
 
 #ifdef USE_OPENCL
-
-		queue.enqueueWriteBuffer(inputBuf, CL_FALSE, 0, N * DIM * sizeof(float), (void*)input, NULL, NULL);
 		queue.enqueueWriteBuffer(centroidBuf, CL_FALSE, 0, K * DIM * sizeof(float), (void*)centroids, NULL, NULL);
 
 		for (int i = 0; i < ITERATIONS; ++i) {
@@ -595,16 +317,15 @@ void exec(int id, bool threaded)
 			queue.enqueueNDRangeKernel(reposition, cl::NullRange, cl::NDRange(DIM), cl::NDRange(RP_LWS), NULL, NULL);
 #endif
 		}
-
-		//queue.enqueueNDRangeKernel(cost, cl::NullRange, cl::NDRange(N), cl::NDRange(CT_LWS), NULL, NULL);
+		queue.enqueueNDRangeKernel(cost, cl::NullRange, cl::NDRange(N), cl::NDRange(CT_LWS), NULL, NULL);
 
 		//queue.finish();
 
-
-
 		queue.enqueueReadBuffer(centroidBuf, CL_FALSE, 0, K * DIM * sizeof(float), centroids, NULL, NULL);
-		queue.enqueueReadBuffer(mappingBuf, CL_TRUE, 0, N * sizeof(int), mapping, NULL, NULL);
-		//queue.enqueueReadBuffer(reductionBuf, CL_FALSE, 0, N * sizeof(float), treduction, NULL, NULL);
+		queue.enqueueReadBuffer(mappingBuf, CL_FALSE, 0, N * sizeof(int), mapping, NULL, NULL);
+		queue.enqueueReadBuffer(reductionBuf, CL_TRUE, 0, N * sizeof(float), reduction, NULL, NULL);
+
+		reduction_group.create_thread(boost::bind(reduce_cost, pass, reduction));
 
 
 		//queue.finish();
@@ -612,20 +333,17 @@ void exec(int id, bool threaded)
 		for (int i = 0; i < ITERATIONS; ++i) {
 			cluster_assignment(input, centroids, mapping);
 			cluster_reposition(input, centroids, mapping);
+			//if (cluster_reposition(input, centroids, mapping)) {
+			//	std::cout << "Converged after " << i+1 << " iterations." << std::endl;
+			//	break;
+			//}
 		}
+
+		cost_list[pass] = cluster_compute_cost(input, centroids, mapping);
 #endif
 
 		float now = clock.get();
 		std::cout << "Device: " << now << std::endl;
-
-#ifdef USE_OPENCL
-		boost::thread worker(boost::bind(save_image, file, w, h, centroids, mapping));
-#else
-		save_image(file, w, h, centroids, mapping);
-#endif
-
-		free(input);
-
 	}
 /*
 	float sum = 0.0f;
@@ -643,9 +361,9 @@ int main(int argc, char** argv)
 {
 	int args = 1;
 #ifdef USE_OPENCL
-	if (argc < 9) {
+	if (argc < 10) {
 #else
-	if (argc < 6) {
+	if (argc < 7) {
 #endif
 		std::cout << "Not enough arguments" << std::endl;
 		system("pause");
@@ -653,9 +371,10 @@ int main(int argc, char** argv)
 	}
 
 	DIM = util::toInt(argv[args++]);
-	N = util::toInt(argv[args++]); N*=N;
+	N = util::toInt(argv[args++]);
 	K = util::toInt(argv[args++]);
 	ITERATIONS = util::toInt(argv[args++]);
+	RUNS = util::toInt(argv[args++]);
 #ifdef USE_OPENCL
 	AM_LWS = util::toInt(argv[args++]);
 	RP_LWS = util::toInt(argv[args++]);
@@ -666,20 +385,12 @@ int main(int argc, char** argv)
 	device_count = util::toInt(argv[args++]);
 #endif
 
-	if (args < argc) {
-		input_folder = argv[args++];
-		if (args < argc) {
-			output_folder = argv[args++];
-			if (args < argc) {
-				uploader = argv[args++];
-			}
-		}
-	}
 
 	std::cout << "DIM = " << DIM << std::endl;
 	std::cout << "N = " << N << std::endl;
 	std::cout << "K = " << K << std::endl;
 	std::cout << "ITERATIONS = " << ITERATIONS << std::endl;
+	std::cout << "RUNS = " << RUNS << std::endl;
 #ifdef USE_OPENCL
 	std::cout << "AM_LWS = " << AM_LWS << std::endl;
 	std::cout << "RP_LWS = " << RP_LWS << std::endl;
@@ -688,17 +399,7 @@ int main(int argc, char** argv)
 #else
 	std::cout << "device_count = " << device_count << std::endl << std::endl;
 #endif
-	std::cout << "input_folder = " << input_folder << std::endl;
-	std::cout << "output_folder = " << output_folder << std::endl;
-	std::cout << "uploader = " << uploader << std::endl;
 
-
-	if (!get_image_files(input_folder)) {
-		std::cerr << "Could not find images" << std::endl;
-		return 1;
-	} else {
-		std::cout << "IMAGE_COUNT = " << image_list.size() << std::endl;
-	}
 
 #ifdef _WIN32
 	rng.seed();
@@ -708,7 +409,7 @@ int main(int argc, char** argv)
 	srand(getTimeMs());
 #endif
 
-	u = boost::uniform_real<float>(0.0f, 256.0f);
+	u = boost::uniform_real<float>(0.0f, 1000000.0f);
 	gen = new boost::variate_generator<boost::mt19937&, boost::uniform_real<float> >(rng, u);
 
 #ifdef USE_OPENCL
@@ -726,7 +427,7 @@ int main(int argc, char** argv)
 		clMappingBuf.push_back(cl::Buffer(clContext, CL_MEM_READ_WRITE, N * sizeof(int), NULL, &clError));
 		if (clError != CL_SUCCESS) std::cout << "OpenCL Error: Could not create buffer" << std::endl;
 
-		clReductionBuf.push_back(cl::Buffer(clContext, CL_MEM_WRITE_ONLY, N * sizeof(int), NULL, &clError));
+		clReductionBuf.push_back(cl::Buffer(clContext, CL_MEM_WRITE_ONLY, N * sizeof(float), NULL, &clError));
 		if (clError != CL_SUCCESS) std::cout << "OpenCL Error: Could not create buffer" << std::endl;
 
 		clClusterAssignment[i].setArgs(clInputBuf[i](), clCentroidBuf[i](), clMappingBuf[i]());
@@ -743,6 +444,24 @@ int main(int argc, char** argv)
 	util::Clock clock;
 	clock.reset();
 
+	for (int i = 0; i < RUNS; ++i) {
+		mapping_list.push_back(NULL);
+		centroids_list.push_back(NULL);
+		cost_list.push_back(0.0f);
+	}
+
+	float* source = new float[N*DIM];
+	for (int i = 0; i < N*DIM; ++i)
+		source[i] = gen_random_float();
+
+	input_list.push_back(source);
+
+	for (int i = 1; i < device_count; ++i) {
+		float* copy = new float[N*DIM];
+		memcpy(copy, source, N*DIM*sizeof(float));
+		input_list.push_back(copy);
+	}
+
 	if (device_count > 1) {
 		boost::thread_group threads;
 
@@ -753,6 +472,38 @@ int main(int argc, char** argv)
 		threads.join_all();
 	} else {
 		exec(0, false);
+	}
+
+#ifdef USE_OPENCL
+	reduction_group.join_all();
+#endif
+
+	int best_result = 0;
+	float best_cost = std::numeric_limits<float>::max();
+	for (int i = 0; i < RUNS; ++i) {
+		if (cost_list[i] < best_cost) {
+			best_cost = cost_list[i];
+			best_result = i;
+		}
+	}
+
+	FILE *out_fdesc = fopen("centroids.out", "wb");
+	fwrite((void*)centroids_list[best_result], K * DIM * sizeof(float), 1, out_fdesc);
+	fclose(out_fdesc);
+
+	out_fdesc = fopen("mapping.out", "wb");
+	fwrite((void*)mapping_list[best_result], N * sizeof(int), 1, out_fdesc);
+	fclose(out_fdesc);
+
+	std::cout << "Best result is " << best_result << std::endl;
+
+	for (int i = 0; i < device_count; ++i) {
+		delete[] input_list[i];
+	}
+
+	for (int i = 0; i < RUNS; ++i) {
+		delete[] mapping_list[i];
+		delete[] centroids_list[i];
 	}
 
 	float now = clock.get();

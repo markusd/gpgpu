@@ -4,6 +4,9 @@
 #ifndef USE_KMEANS_IMG
 
 
+#pragma OPENCL EXTENSION cl_intel_printf enable
+#pragma OPENCL EXTENSION cl_khr_fp64 enable
+
 #include <iostream>
 #include <fstream>
 #include <streambuf>
@@ -61,14 +64,32 @@ cl::Buffer clConvergedBuf;
 #endif
 
 
+
 boost::mt19937 rng;
 boost::uniform_real<float> u;
 boost::variate_generator<boost::mt19937&, boost::uniform_real<float> >* gen;
 
+boost::mt19937 rngd;
+boost::uniform_real<double> ud;
+boost::variate_generator<boost::mt19937&, boost::uniform_real<double> >* gend;
+
+#define FLOAT_TYPE cl_double
+#define REAL_MAX DBL_MAX
 float gen_random_float()
 {
     return (*gen)();
 }
+
+double gen_random_double()
+{
+    return (*gend)();
+}
+
+FLOAT_TYPE gen_random_real()
+{
+    return (FLOAT_TYPE)((*gend)());
+}
+
 
 float absf(float a)
 {
@@ -143,12 +164,13 @@ void cluster_assignment(Vecf* input, Vecf* centroids, int* mapping)
 
 		// for each centroid
 		for (int j = 0; j < K; j++) {
-			float dist = (input[i] - centroids[j]).lenlen();
+			//float dist = (input[i] - centroids[j]).lenlen();
 			//float dist = input[i].distsqr(centroids[j]);
-			//for (int l = 0; l < DIM; ++l) {
-			//	dist += (input[i][l] - centroids[j][l]) * (input[i][l] - centroids[j][l]);
-			//}
-			//dist = sqrtf(dist);
+			float dist = 0.0f;
+			for (int l = 0; l < DIM; ++l) {
+				dist += (input[i][l] - centroids[j][l]) * (input[i][l] - centroids[j][l]);
+			}
+			dist = sqrtf(dist);
 
 			if (dist < min_dist) {
 				mapping[i] = j;
@@ -239,13 +261,23 @@ void initCL()
 }
 #endif
 
+
+
+
+
+
 int main(int argc, char** argv)
 {
 	float time = 0.0f;
+	srand(GetTickCount());
 
 	rng.seed(GetTickCount());
 	u = boost::uniform_real<float>(0.0f, 10.0f);
 	gen = new boost::variate_generator<boost::mt19937&, boost::uniform_real<float> >(rng, u);
+
+	rngd.seed(GetTickCount());
+	ud = boost::uniform_real<double>(0.0, 10.0);
+	gend = new boost::variate_generator<boost::mt19937&, boost::uniform_real<double> >(rngd, ud);
 
 #ifdef USE_CUDA
 #else
@@ -416,7 +448,6 @@ int main(int argc, char** argv)
 
 	clQueue.finish();
 #endif
-
 	float afterRead = clock.get();
 	std::cout << "Read: " << afterRead - afterCompute << std::endl;
 	std::cout << "Total: " << afterRead << std::endl;

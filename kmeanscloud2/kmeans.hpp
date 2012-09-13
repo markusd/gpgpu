@@ -4,7 +4,7 @@
 
 //#define USE_OPENCL
 
-#define CLUSTER_REPOSITION_K
+//#define CLUSTER_REPOSITION_K
 
 /*
 const int DIM = 4;

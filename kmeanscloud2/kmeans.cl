@@ -17,7 +17,7 @@ float distsqr(__global float* a, CENTROID_MEM_TYPE float* b)
 		result += (a[i] - b[i]) * (a[i] - b[i]);
 	}
 
-	return native_sqrt(result);
+	return result;
 }
 
 float distsqr__(float* a, __global float* b)

@@ -28,6 +28,17 @@ char* toString(T value)
 	return strdup(sst.str().c_str());
 }
 
+template<typename T>
+int toInt(T value)
+{
+	std::stringstream sst;
+	sst << value;
+	sst.seekg(0, std::ios::beg);
+	int result;
+	sst >> result;
+	return result;
+}
+
 }
 
 #endif /* TOSTRING_HPP_ */
