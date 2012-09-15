@@ -1,3 +1,8 @@
-DOMINATOR <Copyright (c) 2011 Markus Döllinger, Robert Genz, Raffaela Heller, Markus Holtermann, Timo Hübner, Robert Waury> (https://github.com/Markush2010/dominator/)
+DOMINATOR: <Copyright (c) 2011 Markus Döllinger, Robert Genz, Raffaela Heller, Markus Holtermann, Timo Hübner, Robert Waury> (https://github.com/Markush2010/dominator/)
+	utils/*
+	
 pstdint <Copyright (c) 2005-2007 Paul Hsieh>
+	utils/include/pstdint.h
+	
 RapidXml <Copyright (c) 2006, 2009 Marcin Kalicinski> (http://rapidxml.sourceforge.net/)
+	utils/include/xml/*

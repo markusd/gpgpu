@@ -1,0 +1,23 @@
++--------------+------------------+-------------------------------------------+
+| Subdirectory |      Author      |              Description                  |
++--------------+------------------+-------------------------------------------+
+| aws          | Markus Döllinger | Python scripts used to automate EC2 in-   |
+|              |                  | stance creation and S3 bucket interaction |
++--------------|------------------+-------------------------------------------+
+| common       |                  | Includes for DirectX, OpenGL and OpenCL   |
++--------------+------------------+-------------------------------------------+
+| edges        | Markus Döllinger | Edge and corner detection in CUDA         |
++--------------+------------------+-------------------------------------------+
+| kmeans       | Markus Döllinger | CPU and OpenCL implementation of k-means  |
+|              |                  | with visualization and image quantization |
++--------------+------------------+-------------------------------------------+
+| kmeanscloud  | Markus Döllinger | CPU and OpenCL implementation of k-means  |
+|              |                  | for image quantization on two GPUs and    |
+|              |                  | n threads on an EC2 instance              |
++--------------+------------------+-------------------------------------------+
+| kmeanscloud2 | Markus Döllinger | CPU and OpenCL implementation of k-means  |
+|              |                  | for document clustering on two GPUs and   |
+|              |                  | n threads on an EC2 instance              |
++--------------+------------------+-------------------------------------------+
+| utils        | DOMINATOR Team   | Cross-platform C++ utils                  |
++--------------+------------------+-------------------------------------------+
