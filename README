@@ -4,6 +4,8 @@
 | aws          | Markus Döllinger | Python scripts used to automate EC2 in-   |
 |              |                  | stance creation and S3 bucket interaction |
 +--------------|------------------+-------------------------------------------+
+| clViterbiII  |   Robert Waury   | Viterbi algorithm on the CPU and OpenCL   |
++--------------+------------------+-------------------------------------------+
 | common       |                  | Includes for DirectX, OpenGL and OpenCL   |
 +--------------+------------------+-------------------------------------------+
 | edges        | Markus Döllinger | Edge and corner detection in CUDA         |
@@ -20,4 +22,8 @@
 |              |                  | n threads on an EC2 instance              |
 +--------------+------------------+-------------------------------------------+
 | utils        | DOMINATOR Team   | Cross-platform C++ utils                  |
++--------------+------------------+-------------------------------------------+
+| waves        | Markus Döllinger | Wave simulation and visualizaton in CUDA, |
+|              |                  | OpenCL and DirectCompute using OpenGL and |
+|              |                  | Direct3D 11.                              |
 +--------------+------------------+-------------------------------------------+

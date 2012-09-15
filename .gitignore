@@ -34,6 +34,8 @@ moc_*
 *.bmp
 *.o
 *.dds
+*.tlog
+*.vcxproj.filters
 ## VS diretories
 [Bb]in
 [Dd]ebug*/
